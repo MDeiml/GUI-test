@@ -19,7 +19,22 @@ test2 = widgetLayout (tableLayout 2 (Wrap, Fill)) test1
 test2' :: Widget Event (LayoutItem LayoutParam) () ()
 test2' = widgetLayout (linearLayout Vertical (Wrap, Fill)) test1
 
+focusWidget :: Widget Event (LayoutItem LayoutParam) () Bool
+focusWidget = widgetLayout (stackLayout (Fill, Fill)) $ proc _ -> do
+    f <- focusListener -< ()
+    let c = if f then Color 255 0 0 else Color 255 255 255
+    widgetOutput -< (\b -> LI { layoutParam = stdParams { pWeightX = Just 1, pWeightY = Just 1 }, layoutDrawables = [DrawShape c $ Rect b] })
+    returnA -< f
+
+test3 :: Widget Event (LayoutItem LayoutParam) () ()
+test3 = widgetLayout (tableLayout 2 (Fill, Fill)) $ proc _ -> do
+    focusWidget -< ()
+    focusWidget -< ()
+    focusWidget -< ()
+    focusWidget -< ()
+    returnA -< ()
+
 main :: IO ()
 main = do
     r <- (create "Test" (800,600) :: IO GLFWRenderer)
-    mainLoop r test2
+    mainLoop r test3
