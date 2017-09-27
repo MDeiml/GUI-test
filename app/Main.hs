@@ -20,7 +20,7 @@ test2' :: Widget Event (LayoutItem LayoutParam) () ()
 test2' = widgetLayout (linearLayout Vertical (Wrap, Fill)) test1
 
 focusWidget :: Widget Event (LayoutItem LayoutParam) () Bool
-focusWidget = widgetLayout (stackLayout (AlignCenter, AlignTop) (Fill, Fill)) $ proc _ -> do
+focusWidget = widgetLayout (stackLayout (AlignCenter, AlignCenter) (Fill, Fill)) $ proc _ -> do
     f <- focusListener -< ()
     let c = if f then Color 255 0 0 else Color 255 255 255
     widgetOutput -< (\b -> LI { layoutParam = stdParams { pWidth = 100, pHeight = 200 }, layoutDrawables = [DrawShape c $ Rect b] })
