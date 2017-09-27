@@ -3,6 +3,9 @@ module Layout
     , LayoutParam(..)
     , Orientation(..)
     , FillBehaviour(..)
+    , Align(..)
+    , AlignTop
+    , AlignBottom
     , Layout
     , widgetLayout
     , linearLayout
@@ -33,6 +36,13 @@ data FillBehaviour
     = Fill
     | Wrap
 
+data Align
+    = AlignLeft
+    | AlignCenter
+    | AlignRight
+
+-- AlignTop = AlignLeft
+-- AlignBottom = AlignRight
 data LayoutParam = LayoutParam
     { pWidth :: Float
     , pHeight :: Float
@@ -62,8 +72,11 @@ widgetLayout f w = buildWidget runWidget'
         bs' = calcBounds bs -- bounds are calculated from result of f
         drawables = concatMap layoutDrawables r
 
-stackLayout :: (FillBehaviour, FillBehaviour) -> Layout LayoutParam LayoutParam
-stackLayout (lx, ly) ps = (calcBounds, param)
+stackLayout ::
+       (Align, Align)
+    -> (FillBehaviour, FillBehaviour)
+    -> Layout LayoutParam LayoutParam
+stackLayout (ax, ay) (lx, ly) ps = (calcBounds, param)
   where
     pw = maximum $ map pWidth ps
     ph = maximum $ map pHeight ps
@@ -79,12 +92,20 @@ stackLayout (lx, ly) ps = (calcBounds, param)
         LayoutParam {pWidth = pw, pHeight = ph, pWeightX = wx, pWeightY = wy}
     calcBounds bs@(Bounds x0 y0 x1 y1) = map cb ps
       where
-        cb p =
-            Bounds
-                x0
-                y0
-                (maybe (min (x0 + pWidth p) x1) (const x1) (pWeightX p))
-                (maybe (min (y0 + pHeight p) y1) (const y1) (pWeightY p))
+        cb p = Bounds (xs + x0) (ys + y0) (xs + x0 + width) (ys + y0 + height)
+          where
+            width = maybe (min (pWidth p) x1) (const (x1 - x0)) (pWeightX p)
+            height = maybe (min (pHeight p) y1) (const (y1 - y0)) (pWeightY p)
+            xs =
+                case ax of
+                    AlignLeft -> 0
+                    AlignCenter -> ((x1 - x0) - width) / 2
+                    AlignRight -> (x1 - x0) - width
+            ys =
+                case ay of
+                    AlignLeft -> 0
+                    AlignCenter -> ((y1 - y0) - height) / 2
+                    AlignRight -> (y1 - y0) - height
 
 linearLayout ::
        Orientation
