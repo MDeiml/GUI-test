@@ -11,7 +11,8 @@ import Layout
 import Types
 import Widget
 
-mainLoop :: (Renderer r) => r -> Widget Event Drawable LayoutParam () o -> IO ()
+mainLoop ::
+       (Renderer r) => r -> Widget Event [Drawable] LayoutParam () o -> IO ()
 mainLoop r w = do
     (width, height) <- getSize r
     events <- pollEvents r
@@ -19,17 +20,15 @@ mainLoop r w = do
     let ws =
             map (\e x -> (snd $ runWidget x e) () [Bounds 0 0 width height]) $
             Time time : events
-        (w', d, a) =
+        (w', a) =
             foldl
-                (\(x, d, _a) f ->
-                     let (_o, a, d', x') = f x
-                     in (x', d || d', a))
-                (w, False, undefined)
+                (\(x, _a) f ->
+                     let (_o, a, x') = f x
+                     in (x', a))
+                (w, undefined)
                 ws
-    when d $ do
-        putStrLn "test"
-        clear r
-        mapM_ (render r) $ concat a
+    clear r
+    mapM_ (render r) $ concat a
     swapBuffers r
     c <- closing r
     unless c $ mainLoop r w'
