@@ -54,16 +54,33 @@ noLayout :: Layout p p
 noLayout ps = (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
 widgetLayout ::
-       Layout p1 p2 -> Widget g [Drawable] p1 i o -> Widget g [Drawable] p2 i o
-widgetLayout f w = buildWidget runWidget'
+       (Eq p1)
+    => Layout p1 p2
+    -> Widget g [Drawable] p1 i o
+    -> Widget g [Drawable] p2 i o
+widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
-    runWidget' g = (p, runWidget'')
+    runWidget' w0 mbs g = (p, runWidget'')
       where
-        (ps, w') = runWidget w g
-        (calcBounds, p) = f ps
-        runWidget'' i bs = (o, concat rs, widgetLayout f w'')
+        (ps, w') = runWidget w0 g
+        (calcBounds, p) =
+            case mbs of
+                Nothing -> f ps
+                Just (ps', p', cb, b, bs) ->
+                    if ps' == ps
+                        then ( \x ->
+                                   if x == b
+                                       then bs
+                                       else cb x
+                             , p')
+                        else f ps
+        runWidget'' i bs =
+            ( o
+            , concat rs
+            , buildWidget $ runWidget' w'' $ Just (ps, p, calcBounds, bs, bs'))
           where
-            (o, rs, w'') = w' i $ calcBounds bs
+            bs' = calcBounds bs
+            (o, rs, w'') = w' i bs'
 
 stackLayout ::
        Margin
