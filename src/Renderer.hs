@@ -3,7 +3,7 @@ module Renderer
     , Renderer(..)
     ) where
 
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Drawable
 import Input
@@ -11,23 +11,25 @@ import Layout
 import Types
 import Widget
 
-mainLoop :: (Renderer r) => r -> Widget Event (LayoutItem p) () o -> IO ()
+mainLoop :: (Renderer r) => r -> Widget Event Drawable LayoutParam () o -> IO ()
 mainLoop r w = do
     (width, height) <- getSize r
     events <- pollEvents r
     time <- fmap (round . (* 1000)) getPOSIXTime
     let ws =
-            map (\e x -> runWidget x e [Bounds 0 0 width height] ()) $
-            (Time time) : events
-        (w', d) =
+            map (\e x -> (snd $ runWidget x e) () [Bounds 0 0 width height]) $
+            Time time : events
+        (w', d, a) =
             foldl
-                (\(x, _d) f ->
-                     let (_o, d, x') = f x
-                     in (x', d))
-                (w, undefined)
+                (\(x, d, _a) f ->
+                     let (_o, a, d', x') = f x
+                     in (x', d || d', a))
+                (w, False, undefined)
                 ws
-    clear r
-    mapM_ (render r) $ concatMap layoutDrawables d
+    when d $ do
+        putStrLn "test"
+        clear r
+        mapM_ (render r) $ concat a
     swapBuffers r
     c <- closing r
     unless c $ mainLoop r w'

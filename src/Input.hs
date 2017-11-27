@@ -34,16 +34,11 @@ data Event
     | Time Integer
 
 mouseListener ::
-       Widget Event (LayoutItem LayoutParam) () (Maybe ( MouseButton
-                                                       , ButtonState))
+       Widget Event r LayoutParam () (Maybe (MouseButton, ButtonState))
 mouseListener =
-    buildWidget $ \e bs _i ->
-        ( f e bs
-        , LI
-          { layoutParam = stdParams {pWeightX = Just 1, pWeightY = Just 1}
-          , layoutDrawables = []
-          }
-        , mouseListener)
+    buildWidget $ \e ->
+        ( stdParams {pWeightX = Just 1, pWeightY = Just 1}
+        , \_ bs -> (f e bs, [], False, mouseListener))
   where
     f e bs =
         case e of
@@ -53,17 +48,13 @@ mouseListener =
                     else Nothing
             _ -> Nothing
 
-focusListener :: Widget Event (LayoutItem LayoutParam) () Bool
+focusListener :: Widget Event r LayoutParam () Bool
 focusListener = focusListener' False
   where
     focusListener' f =
-        buildWidget $ \e bs _i ->
-            ( f' e bs
-            , LI
-              { layoutParam = stdParams {pWeightX = Just 1, pWeightY = Just 1}
-              , layoutDrawables = []
-              }
-            , focusListener' $ f' e bs)
+        buildWidget $ \e ->
+            ( stdParams {pWeightX = Just 1, pWeightY = Just 1}
+            , \_ bs -> (f' e bs, [], False, focusListener' $ f' e bs))
       where
         f' e bs =
             case e of
