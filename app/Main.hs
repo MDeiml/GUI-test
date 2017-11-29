@@ -4,6 +4,7 @@ module Main where
 import Control.Arrow (returnA)
 import GLFWRenderer
 import Lib
+import Font
 
 test1 :: Widget Event [Drawable] LayoutParam () ()
 test1 = proc _ -> do
@@ -34,7 +35,9 @@ test3 = widgetLayout (tableLayout 2 (Just 1, Just 1)) $ proc _ -> do
     focusWidget -< ()
     returnA -< ()
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
     r <- create "Test" (800,600) :: IO GLFWRenderer
-    mainLoop r test2'
+    mainLoop r test3
+
+main = test
