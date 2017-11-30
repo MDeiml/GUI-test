@@ -1,8 +1,7 @@
 module Font
-    ( fontFace
-    , generateAtlas
+    ( generateAtlas
     , fontTest
-    , set
+    , Font(..)
     ) where
 
 import Control.Monad
@@ -19,6 +18,8 @@ import qualified Graphics.Rendering.FreeType.Internal.BitmapSize
        as BS
 import Graphics.Rendering.FreeType.Internal.Face
 import Graphics.Rendering.FreeType.Internal.FaceType
+import qualified Graphics.Rendering.FreeType.Internal.GlyphMetrics
+       as GM
 import Graphics.Rendering.FreeType.Internal.GlyphSlot
 import Graphics.Rendering.FreeType.Internal.Library
 import Graphics.Rendering.FreeType.Internal.PrimitiveTypes
@@ -31,7 +32,17 @@ data Glyph = Glyph
     { gBitmap :: [Word8]
     , gWidth :: Int
     , gHeight :: Int
+    , gBearingX :: Int
+    , gBearingY :: Int
+    , gAdvance :: Int
     , gCharcode :: Integer
+    }
+
+data Font = Font
+    { fontTex :: GL.TextureObject
+    , charCoords :: Integer -> (Float, Float, Float, Float)
+    , fontMetrics :: Integer -> (Int, Int, Int, Int, Int)
+    , ascent :: Int
     }
 
 getCharBitmap :: FT_Face -> FT_UInt -> Int -> IO Glyph
@@ -39,9 +50,10 @@ getCharBitmap ff index px = do
     runFreeType $ ft_Set_Pixel_Sizes ff (fromIntegral px) 0
     runFreeType $ ft_Load_Glyph ff index 0
     slot <- peek $ glyph ff
-    l <- peek $ bitmap_left slot
-    t <- peek $ bitmap_top slot
-    -- putStrLn $ concat ["left:", show l, "\ntop:", show t]
+    m <- peek $ metrics slot
+    let bx = fromIntegral (GM.horiBearingX m) `quot` 64
+        by = fromIntegral (GM.horiBearingY m) `quot` 64
+        ad = fromIntegral (GM.horiAdvance m) `quot` 64
     runFreeType $ ft_Render_Glyph slot ft_RENDER_MODE_NORMAL
     bmp <- peek $ bitmap slot
     let w = fromIntegral $ width bmp
@@ -49,7 +61,16 @@ getCharBitmap ff index px = do
     bmp' <-
         forM [0 .. fromIntegral (w * h) - 1] $ \i ->
             peek $ buffer bmp `plusPtr` i :: IO Word8
-    return Glyph {gBitmap = bmp', gWidth = w, gHeight = h, gCharcode = 0}
+    return
+        Glyph
+        { gBitmap = bmp'
+        , gWidth = w
+        , gHeight = h
+        , gCharcode = 0
+        , gBearingX = bx
+        , gBearingY = by
+        , gAdvance = ad
+        }
 
 getCharBitmaps :: FT_Face -> Int -> IO [Glyph]
 getCharBitmaps = getCharBitmaps' Nothing
@@ -67,15 +88,17 @@ getCharBitmaps = getCharBitmaps' Nothing
         if index == 0 || char >= 128
             then return []
             else do
-                print char
                 g <- getCharBitmap ff index px
                 gs <- getCharBitmaps' (Just char) ff px
                 return $ g {gCharcode = fromIntegral char} : gs
 
-layoutGlyphs :: [Glyph] -> ([Word8], Integer -> (Int, Int, Int, Int), Int)
+layoutGlyphs ::
+       [Glyph] -> ([Word8], Integer -> (Int, Int, Int, Int, Int, Int, Int), Int)
 layoutGlyphs glyphs =
     ( concat bmpFull'
-    , \x -> fromMaybe (head pos) $ lookup x $ zip (map gCharcode sorted) pos
+    , \x ->
+          fromMaybe (head metrics) $
+          lookup x $ zip (map gCharcode sorted) metrics
     , size)
   where
     sorted = sortBy (\a b -> compare (gHeight b) (gHeight a)) glyphs
@@ -89,6 +112,12 @@ layoutGlyphs glyphs =
     bmpFull' =
         take size bmpFull ++
         replicate (size - length bmpFull) (replicate size 0)
+    metrics =
+        zipWith
+            (\(a, b, c, d) e ->
+                 (a, b, c, d, gBearingX e, gBearingY e, gAdvance e))
+            pos
+            sorted
     layoutGlyphs' ::
            Int
         -> [Glyph]
@@ -125,15 +154,23 @@ layoutGlyphs glyphs =
     comp _ [] = []
     comp n xs = take n xs : comp n (drop n xs)
 
-generateAtlas ::
-       FT_Face -> Int -> IO ([Word8], Integer -> (Int, Int, Int, Int), Int)
-generateAtlas ff px = do
-    t1 <- getCurrentTime
+generateAtlas :: FilePath -> Int -> IO Font
+generateAtlas fp px = do
+    ff <- fontFace fp
+    asc <- peek $ ascender ff
+    u <- peek $ units_per_EM ff
     glyphs <- getCharBitmaps ff px
-    let lg = layoutGlyphs glyphs
-    t2 <- getCurrentTime
-    print $ t2 `diffUTCTime` t1
-    return lg
+    let (bmp, lu, size) = layoutGlyphs glyphs
+        f = (/ fromIntegral size) . fromIntegral
+    tex <- bitmapToTexture size size bmp
+    return
+        Font
+        { fontTex = tex
+        , charCoords =
+              (\(x, y, w, h, _, _, _) -> (f x, f y, f $ x + w, f $ y + h)) . lu
+        , fontMetrics = (\(_, _, w, h, x, y, a) -> (w, h, x, y, a)) . lu
+        , ascent = (fromIntegral asc * px) `quot` fromIntegral u
+        }
 
 set :: (Show a) => [[a]] -> [[a]] -> (Int, Int) -> [[a]]
 set a [] _ = a
@@ -198,25 +235,23 @@ fontTest = do
         (\win -> do
              G.makeContextCurrent $ Just win
              GL.texture GL.Texture2D $= GL.Enabled
-             ff <-
-                 fontFace
+             font <-
+                 generateAtlas
                      "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf"
-             (atlas, lu, size) <- generateAtlas ff 64
-             tex <- bitmapToTexture size size atlas
-             let (x, y, w, h) = lu $ fromIntegral $ fromEnum 'a'
-                 f = fromIntegral
-                 (x0, y0, x1, y1) =
-                     ( f x / f size
-                     , f y / f size
-                     , f (x + w) / f size
-                     , f (y + h) / f size)
+                     64
+             let (x0, y0, x1, y1) =
+                     charCoords font $ fromIntegral $ fromEnum 'a'
              -- (tex, aspect) <-
              --     loadCharacter
              --         "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf"
              --         'k'
              --         512
              GL.clearColor $= GL.Color4 0 0 0 (1 :: GL.GLfloat)
-             mainLoop tex (f w / f h) win (x0, y0, x1, y1))
+             mainLoop
+                 (fontTex font)
+                 ((x1 - x0) / (y1 - y0))
+                 win
+                 (x0, y0, x1, y1))
         window
   where
     mainLoop tex aspect win (x0, y0, x1, y1) = do

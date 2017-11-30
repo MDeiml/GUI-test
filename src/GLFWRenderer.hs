@@ -3,10 +3,14 @@ module GLFWRenderer
     , GLFWRenderer
     ) where
 
+import Control.Arrow ((***))
+import Control.Monad
 import Data.IORef
 import Data.Word
 import Drawable
+import Font
 import qualified Graphics.Rendering.OpenGL as GL
+import Graphics.Rendering.OpenGL (($=))
 import qualified Graphics.UI.GLFW as G
 import Input
 import Renderer
@@ -15,6 +19,7 @@ import Types
 data GLFWRenderer = GLFWRenderer
     { window :: G.Window
     , events :: IORef [Event]
+    , fonts :: IORef [((String, Int), Font)]
     }
 
 color :: Word8 -> Word8 -> Word8 -> IO ()
@@ -27,6 +32,11 @@ vertex x y z =
     GL.vertex
         (GL.Vertex3 (realToFrac x) (realToFrac y) (realToFrac z) :: GL.Vertex3 GL.GLdouble)
 
+texCoord :: Float -> Float -> IO ()
+texCoord x y =
+    GL.texCoord
+        (GL.TexCoord2 (realToFrac x) (realToFrac y) :: GL.TexCoord2 GL.GLdouble)
+
 instance Renderer GLFWRenderer where
     create title (w, h) = do
         _ <- G.init
@@ -34,11 +44,14 @@ instance Renderer GLFWRenderer where
         maybe
             (error "Window could not be crated")
             (\win' -> do
+                 G.makeContextCurrent $ Just win'
+                 GL.texture GL.Texture2D $= GL.Enabled
                  es <- newIORef []
+                 fs <- newIORef []
                  G.setKeyCallback win' $ Just $ kc es
                  G.setMouseButtonCallback win' $ Just $ mc es
                  G.setCursorPosCallback win' $ Just $ mmc es
-                 return GLFWRenderer {window = win', events = es})
+                 return GLFWRenderer {window = win', events = es, fonts = fs})
             win
       where
         kc es _win key _code ks _mod = do
@@ -76,6 +89,41 @@ instance Renderer GLFWRenderer where
             vertex x1 y0 0
             vertex x1 y1 0
             vertex x0 y1 0
+    render re (DrawShape (Color r g b) (Text text fontname (Coords x y) size)) = do
+        (w, h) <- G.getFramebufferSize $ window re
+        G.makeContextCurrent $ Just $ window re
+        fs <- readIORef $ fonts re
+        f <-
+            case lookup (fontname, size) fs of
+                Just f' -> return f'
+                Nothing -> do
+                    f' <- generateAtlas fontname size
+                    writeIORef (fonts re) $ ((fontname, size), f') : fs
+                    return f'
+        GL.loadIdentity
+        GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
+        GL.renderPrimitive GL.Quads $ do
+            when False $ color r g b
+            foldM_
+                (\x' c -> do
+                     let (x0, y0, x1, y1) = charCoords f c
+                         fi = fromIntegral
+                         (w, h, bx, by, a) =
+                             let (a1, a2, a3, a4, a5) = fontMetrics f c
+                             in (fi a1, fi a2, fi a3, fi a4, fi a5)
+                         y' = y + fromIntegral (ascent f) - by
+                         x'' = x' + bx
+                     texCoord x0 y0
+                     vertex x'' y' 0
+                     texCoord x1 y0
+                     vertex (x'' + w) y' 0
+                     texCoord x1 y1
+                     vertex (x'' + w) (y' + h) 0
+                     texCoord x0 y1
+                     vertex x'' (y' + h) 0
+                     return (x' + a))
+                x $
+                map (fromIntegral . fromEnum) text
     clear r = do
         G.makeContextCurrent $ Just $ window r
         GL.clear [GL.ColorBuffer]

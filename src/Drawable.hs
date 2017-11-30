@@ -23,6 +23,7 @@ data Shape
     | Line { p0 :: Coords
            , p1 :: Coords }
     | Text { text :: String
+           , fontname :: String
            , p0 :: Coords
-           , size :: Float }
+           , size :: Int }
     deriving (Show, Eq)
