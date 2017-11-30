@@ -142,25 +142,34 @@ instance Renderer GLFWRenderer where
         GL.renderPrimitive GL.Quads $ do
             color r g b
             foldM_
-                (\x' c -> do
-                     let (x0, y0, x1, y1) = charCoords f c
-                         fi = fromIntegral
-                         (w, h, bx, by, a) =
-                             let (a1, a2, a3, a4, a5) = fontMetrics f c
-                             in (fi a1, fi a2, fi a3, fi a4, fi a5)
-                         y' = y + fromIntegral (ascent f) - by
-                         x'' = x' + bx
-                     texCoord x0 y0
-                     vertex x'' y' 0
-                     texCoord x1 y0
-                     vertex (x'' + w) y' 0
-                     texCoord x1 y1
-                     vertex (x'' + w) (y' + h) 0
-                     texCoord x0 y1
-                     vertex x'' (y' + h) 0
-                     return (x' + a))
-                x $
-                map (fromIntegral . fromEnum) text
+                (\(x', y') c ->
+                     if c == '\n'
+                         then return
+                                  ( x
+                                  , y' +
+                                    fromIntegral
+                                        (ascent f - descent f +
+                                         round (fromIntegral size * 0.2)))
+                         else do
+                             let c' = fromIntegral $ fromEnum c
+                                 (x0, y0, x1, y1) = charCoords f c'
+                                 fi = fromIntegral
+                                 (w, h, bx, by, a) =
+                                     let (a1, a2, a3, a4, a5) = fontMetrics f c'
+                                     in (fi a1, fi a2, fi a3, fi a4, fi a5)
+                                 y'' = y' + fromIntegral (ascent f) - by
+                                 x'' = x' + bx
+                             texCoord x0 y0
+                             vertex x'' y'' 0
+                             texCoord x1 y0
+                             vertex (x'' + w) y'' 0
+                             texCoord x1 y1
+                             vertex (x'' + w) (y'' + h) 0
+                             texCoord x0 y1
+                             vertex x'' (y'' + h) 0
+                             return (x' + a, y'))
+                (x, y)
+                text
     clear r = do
         G.makeContextCurrent $ Just $ window r
         GL.clear [GL.ColorBuffer]

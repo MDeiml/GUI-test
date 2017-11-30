@@ -43,6 +43,7 @@ data Font = Font
     , charCoords :: Integer -> (Float, Float, Float, Float)
     , fontMetrics :: Integer -> (Int, Int, Int, Int, Int)
     , ascent :: Int
+    , descent :: Int
     }
 
 getCharBitmap :: FT_Face -> FT_UInt -> Int -> IO Glyph
@@ -158,6 +159,7 @@ generateAtlas :: FilePath -> Int -> IO Font
 generateAtlas fp px = do
     ff <- fontFace fp
     asc <- peek $ ascender ff
+    desc <- peek $ descender ff
     u <- peek $ units_per_EM ff
     glyphs <- getCharBitmaps ff px
     let (bmp, lu, size) = layoutGlyphs glyphs
@@ -170,6 +172,7 @@ generateAtlas fp px = do
               (\(x, y, w, h, _, _, _) -> (f x, f y, f $ x + w, f $ y + h)) . lu
         , fontMetrics = (\(_, _, w, h, x, y, a) -> (w, h, x, y, a)) . lu
         , ascent = (fromIntegral asc * px) `quot` fromIntegral u
+        , descent = (fromIntegral desc * px) `quot` fromIntegral u
         }
 
 set :: (Show a) => [[a]] -> [[a]] -> (Int, Int) -> [[a]]
