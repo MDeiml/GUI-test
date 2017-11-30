@@ -5,6 +5,7 @@ module GLFWRenderer
 
 import Control.Arrow ((***))
 import Control.Monad
+import qualified Data.ByteString as BS
 import Data.IORef
 import Data.Word
 import Drawable
@@ -20,6 +21,7 @@ data GLFWRenderer = GLFWRenderer
     { window :: G.Window
     , events :: IORef [Event]
     , fonts :: IORef [((String, Int), Font)]
+    , fontShader :: GL.Program
     }
 
 color :: Word8 -> Word8 -> Word8 -> IO ()
@@ -37,6 +39,30 @@ texCoord x y =
     GL.texCoord
         (GL.TexCoord2 (realToFrac x) (realToFrac y) :: GL.TexCoord2 GL.GLdouble)
 
+loadShader :: FilePath -> GL.ShaderType -> IO (Either String GL.Shader)
+loadShader fp st = do
+    shader <- GL.createShader st
+    source <- BS.readFile fp
+    GL.shaderSourceBS shader $= source
+    GL.compileShader shader
+    status <- GL.get $ GL.compileStatus shader
+    if status
+        then return $ Right shader
+        else Left <$> GL.get (GL.shaderInfoLog shader)
+
+createProgram :: (FilePath, FilePath) -> IO GL.Program
+createProgram (fileV, fileF) = do
+    vert <- either error id <$> loadShader fileV GL.VertexShader
+    frag <- either error id <$> loadShader fileF GL.FragmentShader
+    prog <- GL.createProgram
+    GL.attachShader prog vert
+    GL.attachShader prog frag
+    GL.linkProgram prog
+    status <- GL.get $ GL.linkStatus prog
+    if status
+        then return prog
+        else GL.get (GL.programInfoLog prog) >>= error
+
 instance Renderer GLFWRenderer where
     create title (w, h) = do
         _ <- G.init
@@ -51,7 +77,16 @@ instance Renderer GLFWRenderer where
                  G.setKeyCallback win' $ Just $ kc es
                  G.setMouseButtonCallback win' $ Just $ mc es
                  G.setCursorPosCallback win' $ Just $ mmc es
-                 return GLFWRenderer {window = win', events = es, fonts = fs})
+                 fontS <- createProgram ("fontShader.vert", "fontShader.frag")
+                 GL.blend $= GL.Enabled
+                 GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+                 return
+                     GLFWRenderer
+                     { window = win'
+                     , events = es
+                     , fonts = fs
+                     , fontShader = fontS
+                     })
             win
       where
         kc es _win key _code ks _mod = do
@@ -83,6 +118,7 @@ instance Renderer GLFWRenderer where
         G.makeContextCurrent $ Just $ window re
         GL.loadIdentity
         GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
+        GL.currentProgram $= Nothing
         GL.renderPrimitive GL.Quads $ do
             color r g b
             vertex x0 y0 0
@@ -102,8 +138,9 @@ instance Renderer GLFWRenderer where
                     return f'
         GL.loadIdentity
         GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
+        GL.currentProgram $= Just (fontShader re)
         GL.renderPrimitive GL.Quads $ do
-            when False $ color r g b
+            color r g b
             foldM_
                 (\x' c -> do
                      let (x0, y0, x1, y1) = charCoords f c
