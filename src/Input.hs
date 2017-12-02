@@ -12,12 +12,14 @@ module Input
 import Control.Applicative
 import Graphics.UI.GLFW (Key(..))
 import Layout
+import Resources
 import Types
 import Widget
 
-data Globals = Globals
+data Globals t = Globals
     { gEvents :: [Event]
     , gTime :: Integer
+    , gResources :: Resources t
     }
 
 data KeyState
@@ -41,7 +43,7 @@ data Event
 
 mouseListener ::
        (Monoid r, Alternative o)
-    => Widget Globals r LayoutParam () (o (MouseButton, ButtonState))
+    => Widget (Globals t) r LayoutParam () (o (MouseButton, ButtonState))
 mouseListener =
     buildWidget $ \g bs _ ->
         ( foldl (<|>) empty (map (f bs) (gEvents g))
@@ -57,7 +59,7 @@ mouseListener =
                     else empty
             _ -> empty
 
-focusListener :: (Monoid r) => Widget Globals r LayoutParam () Bool
+focusListener :: Widget (Globals t) r LayoutParam () Bool
 focusListener = focusListener' False
   where
     focusListener' focus =
@@ -65,7 +67,7 @@ focusListener = focusListener' False
             (let focus' = foldl (f' bs) focus $ gEvents g
              in ( focus'
                 , stdParams {pWeightX = Just 1, pWeightY = Just 1}
-                , mempty
+                , []
                 , focusListener' focus'))
       where
         f' bs focus' e =

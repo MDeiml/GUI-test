@@ -2,6 +2,7 @@ module Widget
     ( Widget
     , runWidget
     , widgetOutput
+    , widgetOutput'
     , buildWidget'
     , buildWidget
     , shift
@@ -24,10 +25,10 @@ widget ::
 widget = Widget
 
 buildWidget ::
-       (g -> Bounds -> i -> (o, p, r, Widget g r p i o)) -> Widget g r p i o
+       (g -> Bounds -> i -> (o, p, [r], Widget g r p i o)) -> Widget g r p i o
 buildWidget f = widget runWidget'
   where
-    runWidget' g bs i = (o, [p], [r], w)
+    runWidget' g bs i = (o, [p], r, w)
       where
         ~(o, p, r, w) = f g (head bs) i
 
@@ -37,8 +38,11 @@ buildWidget' f =
         let (o, w) = f g i
         in (o, [], [], w)
 
-widgetOutput :: Widget g r p (p, Bounds -> r) ()
-widgetOutput = widget $ \_ bs (p, r) -> ((), [p], [r $ head bs], widgetOutput)
+widgetOutput :: Widget g r p (p, Bounds -> [r]) ()
+widgetOutput = widget $ \_ bs (p, r) -> ((), [p], r $ head bs, widgetOutput)
+
+widgetOutput' :: Widget g r p [r] ()
+widgetOutput' = widget $ \_ _ r -> ((), [], r, widgetOutput')
 
 shift :: a -> Widget g r p a a
 shift x = widget $ \_ _ last -> (x, [], [], shift last)
@@ -67,3 +71,11 @@ instance ArrowLoop (Widget g r p) where
         runWidget' g bs i = (o, p, r, loop a')
           where
             ~(~(o, s), p, r, a') = runWidget a g bs (i, s)
+
+instance ArrowChoice (Widget g r p) where
+    left a = widget runWidget'
+      where
+        runWidget' g bs (Left i) =
+            let (o, p, r, w) = runWidget a g bs i
+            in (Left o, p, r, left w)
+        runWidget' g bs (Right i) = (Right i, [], [], left a)

@@ -1,7 +1,6 @@
 module Font
     ( generateAtlas
     , fontTest
-    , Font(..)
     ) where
 
 import Control.Monad
@@ -26,6 +25,7 @@ import Graphics.Rendering.FreeType.Internal.PrimitiveTypes
 import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
 import qualified Graphics.UI.GLFW as G
+import Resources
 import System.IO.Unsafe
 
 data Glyph = Glyph
@@ -36,14 +36,6 @@ data Glyph = Glyph
     , gBearingY :: Int
     , gAdvance :: Int
     , gCharcode :: Integer
-    }
-
-data Font = Font
-    { fontTex :: GL.TextureObject
-    , charCoords :: Integer -> (Float, Float, Float, Float)
-    , fontMetrics :: Integer -> (Int, Int, Int, Int, Int)
-    , ascent :: Int
-    , descent :: Int
     }
 
 -- |getCharBitmap face index pixel_size
@@ -162,7 +154,7 @@ layoutGlyphs glyphs =
     comp n xs = take n xs : comp n (drop n xs)
 
 -- |Loads all glyphs of the given font file and puts them all in one texture
-generateAtlas :: FilePath -> Int -> IO Font
+generateAtlas :: FilePath -> Int -> IO (Font GL.TextureObject)
 generateAtlas fp px = do
     ff <- fontFace fp
     asc <- peek $ ascender ff
@@ -180,6 +172,8 @@ generateAtlas fp px = do
         , fontMetrics = (\(_, _, w, h, x, y, a) -> (w, h, x, y, a)) . lu
         , ascent = (fromIntegral asc * px) `quot` fromIntegral u
         , descent = (fromIntegral desc * px) `quot` fromIntegral u
+        , fontname = fp
+        , fontsize = px
         }
 
 set :: (Show a) => [[a]] -> [[a]] -> (Int, Int) -> [[a]]

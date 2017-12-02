@@ -1,6 +1,5 @@
 module Layout
-    ( LayoutItem(..)
-    , LayoutParam(..)
+    ( LayoutParam(..)
     , Orientation(..)
     , Align(..)
     , Layout
@@ -18,15 +17,9 @@ import Drawable
 import Types
 import Widget
 
-data LayoutItem p = LI
-    { layoutDrawables :: [Drawable]
-    , layoutParam :: p
-    } deriving (Show, Eq)
-
 type Layout' p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
-type Layout p1 p2 g i o
-     = Widget g [Drawable] p1 i o -> Widget g [Drawable] p2 i o
+type Layout p1 p2 g d i o = Widget g d p1 i o -> Widget g d p2 i o
 
 type Weight = Maybe Float
 
@@ -53,18 +46,18 @@ stdParams =
     LayoutParam
     {pWidth = 0, pHeight = 0, pWeightX = Nothing, pWeightY = Nothing}
 
-noLayout :: (Eq p) => Layout p p g i o
+noLayout :: (Eq p) => Layout p p d g i o
 noLayout =
     widgetLayout $ \ps ->
         (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
-widgetLayout :: (Eq p1) => Layout' p1 p2 -> Layout p1 p2 g i o
+widgetLayout :: (Eq p1) => Layout' p1 p2 -> Layout p1 p2 g d i o
 widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
     runWidget' w0 mbs g bs i =
         ( o
         , p
-        , concat rs
+        , rs
         , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs'))
       where
         ~(o, ps, rs, w') = runWidget w0 g bs' i
@@ -85,7 +78,7 @@ stackLayout ::
        Margin
     -> (Align, Align)
     -> (Weight, Weight)
-    -> Layout LayoutParam LayoutParam g i o
+    -> Layout LayoutParam LayoutParam g d i o
 stackLayout m a l = widgetLayout $ stackLayout' m a l
 
 stackLayout' ::
@@ -127,7 +120,7 @@ stackLayout' (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
                 AlignRight -> (y1 - y0) - height
 
 linearLayout ::
-       Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam g i o
+       Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam g d i o
 linearLayout o l = widgetLayout $ linearLayout' o l
 
 linearLayout' ::
@@ -181,7 +174,7 @@ linearLayout' o (lx, ly) ps = (calcBounds, param)
 --     tpColspan :: Int,
 --     tpLayoutParam :: LayoutParam
 -- }
-tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam g i o
+tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam g d i o
 tableLayout colwidth l = widgetLayout $ tableLayout' colwidth l
 
 tableLayout' :: Int -> (Weight, Weight) -> Layout' LayoutParam LayoutParam

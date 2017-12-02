@@ -1,3 +1,4 @@
+{-# LANGUAGE Arrows #-}
 module Components
     ( label
     , label'
@@ -14,38 +15,41 @@ import Data.Maybe
 import Drawable
 import Input
 import Layout
+import Renderer
+import Resources
 import Types
 import Widget
+import qualified Data.Map as M
 
-background :: Color -> Widget g [Drawable] LayoutParam () ()
+background :: Color -> Widget g (Cmd t) LayoutParam () ()
 background c =
     widgetOutput <<<
     arr
         (const
              ( stdParams {pWeightX = Just 0, pWeightY = Just 0}
-             , (: []) . DrawShape c . Rect))
+             , (: []) . Render . DrawShape c . Rect))
 
 label ::
-       LayoutParam
-    -> String
-    -> Int
-    -> Color
-    -> Widget a [Drawable] LayoutParam String ()
-label p font size c =
+       LayoutParam -> Color -> Widget a (Cmd t) LayoutParam (Font t, String) ()
+label p c =
     widgetOutput <<<
     arr
-        (\s ->
+        (\(font,s) ->
              ( p
              , \(Bounds x y _ _) ->
-                   [DrawShape c $ Text s font (Coords x y) size]))
+                   [Render $ DrawShape c $ Text s (Coords x y) font]))
 
-label' :: LayoutParam -> Int -> Widget a [Drawable] LayoutParam String ()
-label' p size =
-    label
-        p
-        "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf"
-        size
-        (Color 0 0 0)
+label' :: LayoutParam -> Int -> Widget' t String ()
+label' p size = proc s -> do
+    r <- resource -< ResF size "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf"
+    case r of
+      (RFont f) -> label p (Color 0 0 0) -< (f, s)
+
+resource :: Widget (Globals t) (Cmd t) p ResourceId (Resource t)
+resource = proc i -> do
+    widgetOutput' -< [LoadResource i]
+    g <- globals -< ()
+    returnA -< fromJust $ M.lookup i $ gResources g
 
 globals :: Widget g r p () g
 globals = buildWidget' $ \g _ -> (g, globals)
@@ -67,5 +71,5 @@ evLast' x =
         let new = fromMaybe x i
         in (new, evLast' new)
 
-time :: Widget Globals r p () Integer
+time :: Widget (Globals t) r p () Integer
 time = arr gTime <<< globals

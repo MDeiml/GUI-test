@@ -5,11 +5,12 @@ module Drawable
     ) where
 
 import Data.Word (Word8)
+import Resources
 import Types
 
-data Drawable =
+data Drawable t =
     DrawShape Color
-              Shape
+              (Shape t)
     deriving (Show, Eq)
 
 data Color =
@@ -18,12 +19,11 @@ data Color =
           Word8
     deriving (Show, Eq)
 
-data Shape
+data Shape t
     = Rect { rectBounds :: Bounds }
     | Line { p0 :: Coords
            , p1 :: Coords }
     | Text { text :: String
-           , fontname :: String
            , p0 :: Coords
-           , size :: Int }
+           , font :: Font t }
     deriving (Show, Eq)

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module GLFWRenderer
     ( module Renderer
     , GLFWRenderer
@@ -7,6 +9,7 @@ import Control.Arrow ((***))
 import Control.Monad
 import qualified Data.ByteString as BS
 import Data.IORef
+import qualified Data.Map as M
 import Data.Word
 import Drawable
 import Font
@@ -15,12 +18,12 @@ import Graphics.Rendering.OpenGL (($=))
 import qualified Graphics.UI.GLFW as G
 import Input
 import Renderer
+import Resources
 import Types
 
 data GLFWRenderer = GLFWRenderer
     { window :: G.Window
     , events :: IORef [Event]
-    , fonts :: IORef [((String, Int), Font)]
     , defaultShader :: GL.Program
     , fontShader :: GL.Program
     }
@@ -68,7 +71,16 @@ createProgram (fileV, fileF) = do
         then return prog
         else GL.get (GL.programInfoLog prog) >>= error
 
-instance Renderer GLFWRenderer where
+renderInit :: GLFWRenderer -> GL.Program -> IO (Int, Int)
+renderInit re shader = do
+    G.makeContextCurrent $ Just $ window re
+    (w, h) <- G.getFramebufferSize $ window re
+    GL.loadIdentity
+    GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
+    GL.currentProgram $= Just shader
+    return (w, h)
+
+instance Renderer GLFWRenderer GL.TextureObject where
     create title (w, h) = do
         _ <- G.init
         win <- G.createWindow w h title Nothing Nothing
@@ -90,7 +102,6 @@ instance Renderer GLFWRenderer where
                      GLFWRenderer
                      { window = win'
                      , events = es
-                     , fonts = fs
                      , defaultShader = defS
                      , fontShader = fontS
                      })
@@ -121,31 +132,15 @@ instance Renderer GLFWRenderer where
             let event = MouseMoveEvent (Coords (realToFrac x) (realToFrac y))
             in modifyIORef es (event :)
     render re (DrawShape (Color r g b) (Rect (Bounds x0 y0 x1 y1))) = do
-        (w, h) <- G.getFramebufferSize $ window re
-        G.makeContextCurrent $ Just $ window re
-        GL.loadIdentity
-        GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
-        GL.currentProgram $= Just (defaultShader re)
+        (w, h) <- renderInit re (defaultShader re)
         GL.renderPrimitive GL.Quads $ do
             color r g b
             vertex x0 y0 0
             vertex x1 y0 0
             vertex x1 y1 0
             vertex x0 y1 0
-    render re (DrawShape (Color r g b) (Text text fontname (Coords x y) size)) = do
-        (w, h) <- G.getFramebufferSize $ window re
-        G.makeContextCurrent $ Just $ window re
-        fs <- readIORef $ fonts re
-        f <-
-            case lookup (fontname, size) fs of
-                Just f' -> return f'
-                Nothing -> do
-                    f' <- generateAtlas fontname size
-                    writeIORef (fonts re) $ ((fontname, size), f') : fs
-                    return f'
-        GL.loadIdentity
-        GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
-        GL.currentProgram $= Just (fontShader re)
+    render re (DrawShape (Color r g b) (Text text (Coords x y) f)) = do
+        (w, h) <- renderInit re (fontShader re)
         GL.renderPrimitive GL.Quads $ do
             color r g b
             foldM_
@@ -156,7 +151,7 @@ instance Renderer GLFWRenderer where
                                   , y' +
                                     fromIntegral
                                         (ascent f - descent f +
-                                         round (fromIntegral size * 0.2)))
+                                         round (fromIntegral (fontsize f) * 0.2)))
                          else do
                              let c' = fromIntegral $ fromEnum c
                                  (x0, y0, x1, y1) = charCoords f c'
@@ -191,3 +186,6 @@ instance Renderer GLFWRenderer where
         es <- readIORef $ events r
         writeIORef (events r) []
         return es
+    loadResource re (ResF size fontname) = do
+        G.makeContextCurrent $ Just $ window re
+        RFont <$> generateAtlas fontname size
