@@ -58,7 +58,8 @@ widgetLayout f w = buildWidget $ runWidget' w Nothing
         ( o
         , p
         , rs
-        , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs'))
+        , buildWidget $ runWidget' w' Nothing -- TODO $ Just (ps, p, calcBounds, bs, bs'))
+         )
       where
         ~(o, ps, rs, w') = runWidget w0 g bs' i
         ~(calcBounds, p) =

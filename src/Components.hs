@@ -30,20 +30,24 @@ background c =
              , (: []) . Render . DrawShape c . Rect))
 
 label ::
-       LayoutParam -> Color -> Widget a (Cmd t) LayoutParam (Font t, String) ()
-label p c =
-    widgetOutput <<<
-    arr
-        (\(font,s) ->
-             ( p
+       Color -> Widget a (Cmd t) LayoutParam (Font t, String) ()
+label c = proc (f, s) -> do
+    let w = fromIntegral $ sum $ map ((\(_,_,_,_,x) -> x) . fontMetrics f . fromIntegral . fromEnum) s
+        h = fromIntegral (ascent f - descent f) + 1.2 * count '\n' s
+    widgetOutput -< ( stdParams { pHeight = h, pWidth = w }
              , \(Bounds x y _ _) ->
-                   [Render $ DrawShape c $ Text s (Coords x y) font]))
+                   [Render $ DrawShape c $ Text s (Coords x y) f])
+    where
+        count _ [] = 0
+        count a (x:xs)
+            | a == x = 1 + count a xs
+            | otherwise = count a xs
 
 label' :: LayoutParam -> Int -> Widget' t String ()
 label' p size = proc s -> do
     r <- resource -< ResF size "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf"
     case r of
-      (RFont f) -> label p (Color 0 0 0) -< (f, s)
+      (RFont f) -> label (Color 0 0 0) -< (f, s)
 
 resource :: Widget (Globals t) (Cmd t) p ResourceId (Resource t)
 resource = proc i -> do

@@ -41,7 +41,8 @@ test4 = stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $ p
     t <- time -< ()
     t0 <- initial -< t
     let secs = (t - t0) `quot` 1000
-    label' stdParams { pHeight = 50, pWidth = 40} 60 -< show secs 
+    label' stdParams { pHeight = 50, pWidth = 40} 60 -< show secs
+    widgetOutput -< (stdParams, (:[]) . Render . DrawShape (Color 255 0 0) . Rect)
     background (Color 255 255 255) -< ()
 
 test :: IO ()

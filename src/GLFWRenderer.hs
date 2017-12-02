@@ -159,8 +159,10 @@ instance Renderer GLFWRenderer GL.TextureObject where
                                  (w, h, bx, by, a) =
                                      let (a1, a2, a3, a4, a5) = fontMetrics f c'
                                      in (fi a1, fi a2, fi a3, fi a4, fi a5)
-                                 y'' = y' + fromIntegral (ascent f) - by
-                                 x'' = x' + bx
+                                 y'' =
+                                     fromIntegral $
+                                     round $ y' + fromIntegral (ascent f) - by
+                                 x'' = fromIntegral $ round $ x' + bx
                              texCoord x0 y0
                              vertex x'' y'' 0
                              texCoord x1 y0

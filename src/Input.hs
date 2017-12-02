@@ -47,7 +47,7 @@ mouseListener ::
 mouseListener =
     buildWidget $ \g bs _ ->
         ( foldl (<|>) empty (map (f bs) (gEvents g))
-        , stdParams {pWeightX = Just 1, pWeightY = Just 1}
+        , stdParams
         , mempty
         , mouseListener)
   where
@@ -65,10 +65,7 @@ focusListener = focusListener' False
     focusListener' focus =
         buildWidget $ \g bs _ ->
             (let focus' = foldl (f' bs) focus $ gEvents g
-             in ( focus'
-                , stdParams {pWeightX = Just 1, pWeightY = Just 1}
-                , []
-                , focusListener' focus'))
+             in (focus', stdParams, [], focusListener' focus'))
       where
         f' bs focus' e =
             case e of
