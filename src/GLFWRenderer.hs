@@ -1,15 +1,18 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GLFWRenderer
     ( module Renderer
     , GLFWRenderer
     ) where
 
+import qualified Codec.Picture as P
 import Control.Arrow ((***))
 import Control.Monad
 import qualified Data.ByteString as BS
 import Data.IORef
 import qualified Data.Map as M
+import Data.Vector.Storable (unsafeWith)
 import Data.Word
 import Drawable
 import Font
@@ -207,3 +210,34 @@ instance Renderer GLFWRenderer Texture where
     loadResource re (ResF size fontname) = do
         G.makeContextCurrent $ Just $ window re
         RFont <$> generateAtlas fontname size
+    loadResource re (ResI fp) = do
+        img <- P.readImage fp
+        case img of
+            Left s -> return $ Error s
+            Right img' ->
+                case img' of
+                    P.ImageRGBA8 i ->
+                        loadImage i GL.RGBA8 GL.RGBA GL.UnsignedByte
+                    P.ImageRGB8 i -> loadImage i GL.RGB8 GL.RGB GL.UnsignedByte
+      where
+        loadImage img internal format datatype =
+            unsafeWith (P.imageData img) $ \buf -> do
+                tex <- GL.genObjectName
+                GL.textureBinding GL.Texture2D $= Just tex
+                GL.texImage2D
+                    GL.Texture2D
+                    GL.NoProxy
+                    0
+                    internal
+                    (GL.TextureSize2D
+                         (fromIntegral $ P.imageWidth img)
+                         (fromIntegral $ P.imageHeight img))
+                    0
+                    (GL.PixelData format datatype buf)
+                GL.textureFilter GL.Texture2D $=
+                    ((GL.Linear', Nothing), GL.Linear')
+                GL.textureWrapMode GL.Texture2D GL.S $=
+                    (GL.Repeated, GL.ClampToEdge)
+                GL.textureWrapMode GL.Texture2D GL.T $=
+                    (GL.Repeated, GL.ClampToEdge)
+                return $ RImg $ Texture (tex, 0, 0, 1, 1)

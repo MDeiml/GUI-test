@@ -10,6 +10,7 @@ import qualified Data.Map as M
 data Resource t
     = RFont (Font t)
     | RImg t
+    | Error String
 
 data Font t = Font
     { glyphs :: Integer -> t

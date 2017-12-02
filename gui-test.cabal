@@ -24,6 +24,8 @@ library
                      , memory >= 0.14 && < 1
                      , OpenGL >= 3.0 && < 4
                      , time >= 1.6 && < 2
+                     , JuicyPixels >= 3.2 && < 4
+                     , vector >= 0.12 && < 1
   default-language:    Haskell2010
 
 executable gui-test-exe
