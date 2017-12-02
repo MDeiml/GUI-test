@@ -46,6 +46,8 @@ data Font = Font
     , descent :: Int
     }
 
+-- |getCharBitmap face index pixel_size
+-- Loads glyph and renders it
 getCharBitmap :: FT_Face -> FT_UInt -> Int -> IO Glyph
 getCharBitmap ff index px = do
     runFreeType $ ft_Set_Pixel_Sizes ff (fromIntegral px) 0
@@ -73,6 +75,7 @@ getCharBitmap ff index px = do
         , gAdvance = ad
         }
 
+-- |Loads all glyphs of the face in the given size
 getCharBitmaps :: FT_Face -> Int -> IO [Glyph]
 getCharBitmaps = getCharBitmaps' Nothing
   where
@@ -93,6 +96,8 @@ getCharBitmaps = getCharBitmaps' Nothing
                 gs <- getCharBitmaps' (Just char) ff px
                 return $ g {gCharcode = fromIntegral char} : gs
 
+-- |Reorders Glyphs and combines their bitmaps
+-- returns (bitmap, charcode -> (x, y, w, h, bearingX, bearingY, advance)
 layoutGlyphs ::
        [Glyph] -> ([Word8], Integer -> (Int, Int, Int, Int, Int, Int, Int), Int)
 layoutGlyphs glyphs =
@@ -119,13 +124,14 @@ layoutGlyphs glyphs =
                  (a, b, c, d, gBearingX e, gBearingY e, gAdvance e))
             pos
             sorted
+    -- |Generates a square atlas bitmap (if padded with 0's)
     layoutGlyphs' ::
-           Int
-        -> [Glyph]
-        -> Int
-        -> (Int, Int)
-        -> [[Word8]]
-        -> Maybe ([[Word8]], [(Int, Int, Int, Int)])
+           Int -- atlas size
+        -> [Glyph] -- glyphs
+        -> Int -- max glyph height of this row
+        -> (Int, Int) -- current coordinates in atlas
+        -> [[Word8]] -- current atlas
+        -> Maybe ([[Word8]], [(Int, Int, Int, Int)]) -- (bitmap, [(x, y, w, h)])
     layoutGlyphs' _ [] _ _ bmp' = Just (bmp', [])
     layoutGlyphs' size (g:gs) maxH0 (x, y) bmp' = do
         let h = gHeight g
@@ -155,6 +161,7 @@ layoutGlyphs glyphs =
     comp _ [] = []
     comp n xs = take n xs : comp n (drop n xs)
 
+-- |Loads all glyphs of the given font file and puts them all in one texture
 generateAtlas :: FilePath -> Int -> IO Font
 generateAtlas fp px = do
     ff <- fontFace fp

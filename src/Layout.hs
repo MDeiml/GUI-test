@@ -23,7 +23,10 @@ data LayoutItem p = LI
     , layoutParam :: p
     } deriving (Show, Eq)
 
-type Layout p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
+type Layout' p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
+
+type Layout p1 p2 g i o
+     = Widget g [Drawable] p1 i o -> Widget g [Drawable] p2 i o
 
 type Weight = Maybe Float
 
@@ -50,14 +53,12 @@ stdParams =
     LayoutParam
     {pWidth = 0, pHeight = 0, pWeightX = Nothing, pWeightY = Nothing}
 
-noLayout :: Layout p p
-noLayout ps = (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
+noLayout :: (Eq p) => Layout p p g i o
+noLayout =
+    widgetLayout $ \ps ->
+        (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
-widgetLayout ::
-       (Eq p1)
-    => Layout p1 p2
-    -> Widget g [Drawable] p1 i o
-    -> Widget g [Drawable] p2 i o
+widgetLayout :: (Eq p1) => Layout' p1 p2 -> Layout p1 p2 g i o
 widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
     runWidget' w0 mbs g = (p, runWidget'')
@@ -86,14 +87,22 @@ stackLayout ::
        Margin
     -> (Align, Align)
     -> (Weight, Weight)
-    -> Layout LayoutParam LayoutParam
-stackLayout (mt, mb, mr, ml) (ax, ay) (lx, ly) ps = (calcBounds, param)
+    -> Layout LayoutParam LayoutParam g i o
+stackLayout m a l = widgetLayout $ stackLayout' m a l
+
+stackLayout' ::
+       Margin
+    -> (Align, Align)
+    -> (Weight, Weight)
+    -> Layout' LayoutParam LayoutParam
+stackLayout' (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
+    (\bs -> map (calcBounds bs) ps, param)
   where
     pw = mr + ml + pWidth (head ps)
     ph = mt + mb + pHeight (head ps)
     param =
         LayoutParam {pWidth = pw, pHeight = ph, pWeightX = lx, pWeightY = ly}
-    calcBounds (Bounds x0' y0' x1' y1') = map (const bs) ps
+    calcBounds (Bounds x0' y0' x1' y1') p = bs
       where
         x0 = x0' + ml
         y0 = y0' + mt
@@ -101,11 +110,11 @@ stackLayout (mt, mb, mr, ml) (ax, ay) (lx, ly) ps = (calcBounds, param)
         y1 = y1' - mb
         bs = Bounds (xs + x0) (ys + y0) (xs + x0 + width) (ys + y0 + height)
         width =
-            case pWeightX (head ps) of
+            case pWeightX p of
                 Nothing -> pw
                 Just _ -> x1 - x0
         height =
-            case pWeightY (head ps) of
+            case pWeightY p of
                 Nothing -> ph
                 Just _ -> y1 - y0
         xs =
@@ -120,8 +129,12 @@ stackLayout (mt, mb, mr, ml) (ax, ay) (lx, ly) ps = (calcBounds, param)
                 AlignRight -> (y1 - y0) - height
 
 linearLayout ::
-       Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam
-linearLayout o (lx, ly) ps = (calcBounds, param)
+       Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam g i o
+linearLayout o l = widgetLayout $ linearLayout' o l
+
+linearLayout' ::
+       Orientation -> (Weight, Weight) -> Layout' LayoutParam LayoutParam
+linearLayout' o (lx, ly) ps = (calcBounds, param)
   where
     totalX = sum $ map pWidth ps
     totalY = sum $ map pHeight ps
@@ -170,8 +183,11 @@ linearLayout o (lx, ly) ps = (calcBounds, param)
 --     tpColspan :: Int,
 --     tpLayoutParam :: LayoutParam
 -- }
-tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam
-tableLayout colwidth (lx, ly) ps = (calcBounds, param)
+tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam g i o
+tableLayout colwidth l = widgetLayout $ tableLayout' colwidth l
+
+tableLayout' :: Int -> (Weight, Weight) -> Layout' LayoutParam LayoutParam
+tableLayout' colwidth (lx, ly) ps = (calcBounds, param)
   where
     ps' = reformat ps
     reformat [] = []

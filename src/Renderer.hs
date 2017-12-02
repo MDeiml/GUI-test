@@ -28,7 +28,7 @@ mainLoop r w = do
                 (w, undefined)
                 ws
     clear r
-    mapM_ (render r) $ concat a
+    mapM_ (render r) $ reverse $ concat a
     swapBuffers r
     c <- closing r
     unless c $ mainLoop r w'

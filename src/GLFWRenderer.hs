@@ -21,13 +21,18 @@ data GLFWRenderer = GLFWRenderer
     { window :: G.Window
     , events :: IORef [Event]
     , fonts :: IORef [((String, Int), Font)]
+    , defaultShader :: GL.Program
     , fontShader :: GL.Program
     }
 
 color :: Word8 -> Word8 -> Word8 -> IO ()
 color r g b =
     GL.color
-        (GL.Color3 (realToFrac r) (realToFrac g) (realToFrac b) :: GL.Color3 GL.GLdouble)
+        (GL.Color4
+             (realToFrac r / 255)
+             (realToFrac g / 255)
+             (realToFrac b / 255)
+             1 :: GL.Color4 GL.GLdouble)
 
 vertex :: Float -> Float -> Float -> IO ()
 vertex x y z =
@@ -77,7 +82,8 @@ instance Renderer GLFWRenderer where
                  G.setKeyCallback win' $ Just $ kc es
                  G.setMouseButtonCallback win' $ Just $ mc es
                  G.setCursorPosCallback win' $ Just $ mmc es
-                 fontS <- createProgram ("fontShader.vert", "fontShader.frag")
+                 fontS <- createProgram ("default.vert", "fontShader.frag")
+                 defS <- createProgram ("default.vert", "default.frag")
                  GL.blend $= GL.Enabled
                  GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
                  return
@@ -85,6 +91,7 @@ instance Renderer GLFWRenderer where
                      { window = win'
                      , events = es
                      , fonts = fs
+                     , defaultShader = defS
                      , fontShader = fontS
                      })
             win
@@ -118,7 +125,7 @@ instance Renderer GLFWRenderer where
         G.makeContextCurrent $ Just $ window re
         GL.loadIdentity
         GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
-        GL.currentProgram $= Nothing
+        GL.currentProgram $= Just (defaultShader re)
         GL.renderPrimitive GL.Quads $ do
             color r g b
             vertex x0 y0 0
