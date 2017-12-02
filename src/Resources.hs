@@ -7,12 +7,12 @@ module Resources
 
 import qualified Data.Map as M
 
-newtype Resource t =
-    RFont (Font t)
+data Resource t
+    = RFont (Font t)
+    | RImg t
 
 data Font t = Font
-    { fontTex :: t
-    , charCoords :: Integer -> (Float, Float, Float, Float)
+    { glyphs :: Integer -> t
     , fontMetrics :: Integer -> (Int, Int, Int, Int, Int)
     , ascent :: Int
     , descent :: Int
@@ -20,9 +20,10 @@ data Font t = Font
     , fontsize :: Int
     }
 
-data ResourceId =
-    ResF Int
-         String
+data ResourceId
+    = ResF Int
+           String
+    | ResI FilePath
     deriving (Eq, Ord, Show)
 
 type Resources t = M.Map ResourceId (Resource t)

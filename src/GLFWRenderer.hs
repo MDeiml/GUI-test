@@ -19,6 +19,7 @@ import qualified Graphics.UI.GLFW as G
 import Input
 import Renderer
 import Resources
+import Texture
 import Types
 
 data GLFWRenderer = GLFWRenderer
@@ -71,16 +72,15 @@ createProgram (fileV, fileF) = do
         then return prog
         else GL.get (GL.programInfoLog prog) >>= error
 
-renderInit :: GLFWRenderer -> GL.Program -> IO (Int, Int)
+renderInit :: GLFWRenderer -> GL.Program -> IO ()
 renderInit re shader = do
     G.makeContextCurrent $ Just $ window re
     (w, h) <- G.getFramebufferSize $ window re
     GL.loadIdentity
     GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
     GL.currentProgram $= Just shader
-    return (w, h)
 
-instance Renderer GLFWRenderer GL.TextureObject where
+instance Renderer GLFWRenderer Texture where
     create title (w, h) = do
         _ <- G.init
         win <- G.createWindow w h title Nothing Nothing
@@ -132,15 +132,31 @@ instance Renderer GLFWRenderer GL.TextureObject where
             let event = MouseMoveEvent (Coords (realToFrac x) (realToFrac y))
             in modifyIORef es (event :)
     render re (DrawShape (Color r g b) (Rect (Bounds x0 y0 x1 y1))) = do
-        (w, h) <- renderInit re (defaultShader re)
+        renderInit re (defaultShader re)
+        GL.textureBinding GL.Texture2D $= Nothing
         GL.renderPrimitive GL.Quads $ do
             color r g b
             vertex x0 y0 0
             vertex x1 y0 0
             vertex x1 y1 0
             vertex x0 y1 0
+    render re (Image (Texture (tex, u0, v0, u1, v1)) (Bounds x0 y0 x1 y1)) = do
+        renderInit re $ defaultShader re
+        GL.textureBinding GL.Texture2D $= Just tex
+        GL.renderPrimitive GL.Quads $ do
+            texCoord u0 v0
+            vertex x0 y0 0
+            texCoord u1 v0
+            vertex x1 y0 0
+            texCoord u1 v1
+            vertex x1 y1 0
+            texCoord u0 v1
+            vertex x0 y1 0
     render re (DrawShape (Color r g b) (Text text (Coords x y) f)) = do
-        (w, h) <- renderInit re (fontShader re)
+        renderInit re (fontShader re)
+        let Texture (tex, _, _, _, _) =
+                glyphs f $ fromIntegral $ fromEnum $ head text
+        GL.textureBinding GL.Texture2D $= Just tex
         GL.renderPrimitive GL.Quads $ do
             color r g b
             foldM_
@@ -154,7 +170,7 @@ instance Renderer GLFWRenderer GL.TextureObject where
                                          round (fromIntegral (fontsize f) * 0.2)))
                          else do
                              let c' = fromIntegral $ fromEnum c
-                                 (x0, y0, x1, y1) = charCoords f c'
+                                 Texture (_, x0, y0, x1, y1) = glyphs f c'
                                  fi = fromIntegral
                                  (w, h, bx, by, a) =
                                      let (a1, a2, a3, a4, a5) = fontMetrics f c'

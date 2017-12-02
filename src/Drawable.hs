@@ -8,9 +8,11 @@ import Data.Word (Word8)
 import Resources
 import Types
 
-data Drawable t =
-    DrawShape Color
-              (Shape t)
+data Drawable t
+    = DrawShape Color
+                (Shape t)
+    | Image t
+            Bounds
     deriving (Show, Eq)
 
 data Color =
@@ -20,10 +22,10 @@ data Color =
     deriving (Show, Eq)
 
 data Shape t
-    = Rect { rectBounds :: Bounds }
-    | Line { p0 :: Coords
-           , p1 :: Coords }
-    | Text { text :: String
-           , p0 :: Coords
-           , font :: Font t }
+    = Rect Bounds
+    | Line Coords
+           Coords
+    | Text String
+           Coords
+           (Font t)
     deriving (Show, Eq)

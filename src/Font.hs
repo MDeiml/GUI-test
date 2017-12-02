@@ -1,6 +1,5 @@
 module Font
     ( generateAtlas
-    , fontTest
     ) where
 
 import Control.Monad
@@ -27,6 +26,7 @@ import Graphics.Rendering.OpenGL (($=))
 import qualified Graphics.UI.GLFW as G
 import Resources
 import System.IO.Unsafe
+import Texture
 
 data Glyph = Glyph
     { gBitmap :: [Word8]
@@ -154,7 +154,7 @@ layoutGlyphs glyphs =
     comp n xs = take n xs : comp n (drop n xs)
 
 -- |Loads all glyphs of the given font file and puts them all in one texture
-generateAtlas :: FilePath -> Int -> IO (Font GL.TextureObject)
+generateAtlas :: FilePath -> Int -> IO (Font Texture)
 generateAtlas fp px = do
     ff <- fontFace fp
     asc <- peek $ ascender ff
@@ -166,9 +166,10 @@ generateAtlas fp px = do
     tex <- bitmapToTexture size size bmp
     return
         Font
-        { fontTex = tex
-        , charCoords =
-              (\(x, y, w, h, _, _, _) -> (f x, f y, f $ x + w, f $ y + h)) . lu
+        { glyphs =
+              (\(x, y, w, h, _, _, _) ->
+                   Texture (tex, f x, f y, f $ x + w, f $ y + h)) .
+              lu
         , fontMetrics = (\(_, _, w, h, x, y, a) -> (w, h, x, y, a)) . lu
         , ascent = (fromIntegral asc * px) `quot` fromIntegral u
         , descent = (fromIntegral desc * px) `quot` fromIntegral u
@@ -223,56 +224,3 @@ fontFace fp =
         alloca $ \ptr -> do
             runFreeType $ ft_New_Face freeType str 0 ptr
             peek ptr
-
--- TEST
-vertex :: Float -> Float -> Float -> IO ()
-vertex x y z =
-    GL.vertex
-        (GL.Vertex3 (realToFrac x) (realToFrac y) (realToFrac z) :: GL.Vertex3 GL.GLdouble)
-
-fontTest :: IO ()
-fontTest = do
-    _ <- G.init
-    window <- G.createWindow 800 600 "Font test" Nothing Nothing
-    maybe
-        (error "GLFW error")
-        (\win -> do
-             G.makeContextCurrent $ Just win
-             GL.texture GL.Texture2D $= GL.Enabled
-             font <-
-                 generateAtlas
-                     "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf"
-                     64
-             let (x0, y0, x1, y1) =
-                     charCoords font $ fromIntegral $ fromEnum 'a'
-             -- (tex, aspect) <-
-             --     loadCharacter
-             --         "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf"
-             --         'k'
-             --         512
-             GL.clearColor $= GL.Color4 0 0 0 (1 :: GL.GLfloat)
-             mainLoop
-                 (fontTex font)
-                 ((x1 - x0) / (y1 - y0))
-                 win
-                 (x0, y0, x1, y1))
-        window
-  where
-    mainLoop tex aspect win (x0, y0, x1, y1) = do
-        G.pollEvents
-        GL.clear [GL.ColorBuffer]
-        GL.activeTexture $= GL.TextureUnit 0
-        GL.textureBinding GL.Texture2D $= Just tex
-        let h = 0.8
-            w = h * aspect
-        GL.renderPrimitive GL.Quads $ do
-            vertex (-w) (-h) 0
-            GL.texCoord $ GL.TexCoord2 x1 (y1 :: GL.GLfloat)
-            vertex w (-h) 0
-            GL.texCoord $ GL.TexCoord2 x1 (y0 :: GL.GLfloat)
-            vertex w h 0
-            GL.texCoord $ GL.TexCoord2 x0 (y0 :: GL.GLfloat)
-            vertex (-w) h 0
-            GL.texCoord $ GL.TexCoord2 x0 (y1 :: GL.GLfloat)
-        G.swapBuffers win
-        mainLoop tex aspect win (x0, y0, x1, y1)
