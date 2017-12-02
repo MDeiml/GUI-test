@@ -2,6 +2,7 @@ module Widget
     ( Widget
     , runWidget
     , widgetOutput
+    , buildWidget'
     , buildWidget
     , shift
     ) where
@@ -12,66 +13,57 @@ import Prelude hiding ((.), id)
 import Types
 
 newtype Widget g r p i o = Widget
-    { runWidget1 :: g -> ([p], i -> [Bounds] -> (o, [r], Widget g r p i o))
+    { runWidget1 :: g -> [Bounds] -> i -> (o, [p], [r], Widget g r p i o)
     }
 
 runWidget = runWidget1
 
 widget ::
-       (g -> ([p], i -> [Bounds] -> (o, [r], Widget g r p i o)))
+       (g -> [Bounds] -> i -> (o, [p], [r], Widget g r p i o))
     -> Widget g r p i o
-widget r = Widget {runWidget1 = r}
+widget = Widget
 
 buildWidget ::
-       (g -> (p, i -> Bounds -> (o, r, Widget g r p i o))) -> Widget g r p i o
+       (g -> Bounds -> i -> (o, p, r, Widget g r p i o)) -> Widget g r p i o
 buildWidget f = widget runWidget'
   where
-    runWidget' g = ([p], runWidget'')
+    runWidget' g bs i = (o, [p], [r], w)
       where
-        (p, f') = f g
-        runWidget'' i bs = (o, [r], w)
-          where
-            (o, r, w) = f' i $ head bs
+        ~(o, p, r, w) = f g (head bs) i
 
-widgetOutput :: p -> Widget g r p (Bounds -> r) ()
-widgetOutput p =
-    widget $ const ([p], \r bs -> ((), [r $ head bs], widgetOutput p))
+buildWidget' :: (g -> i -> (o, Widget g r p i o)) -> Widget g r p i o
+buildWidget' f =
+    widget $ \g _ i ->
+        let (o, w) = f g i
+        in (o, [], [], w)
+
+widgetOutput :: Widget g r p (p, Bounds -> r) ()
+widgetOutput = widget $ \_ bs (p, r) -> ((), [p], [r $ head bs], widgetOutput)
 
 shift :: a -> Widget g r p a a
-shift initial = widget $ const ([], \last _ -> (initial, [], shift last))
+shift x = widget $ \_ _ last -> (x, [], [], shift last)
 
 instance Category (Widget g r p) where
-    id = widget $ const ([], \i _ -> (i, [], id))
+    id = widget $ \_ _ i -> (i, [], [], id)
     (.) a b = widget runWidget'
       where
-        runWidget' g = (pb ++ pa, runWidget'')
+        runWidget' g bs i = (oa, pb ++ pa, rb ++ ra, a' . b')
           where
-            (pb, b') = runWidget b g
-            (pa, a') = runWidget a g
-            runWidget'' i bs = (oa, rb ++ ra, a'' . b'')
-              where
-                (ob, rb, b'') = b' i $ take (length pb) bs
-                (oa, ra, a'') = a' ob $ drop (length pb) bs
+            ~(ob, pb, rb, b') = runWidget b g (take (length pb) bs) i
+            ~(oa, pa, ra, a') = runWidget a g (drop (length pb) bs) ob
 
 instance Arrow (Widget g r p) where
-    arr f = widget $ const ([], \i _ -> (f i, [], arr f))
+    arr f = widget $ \_ _ i -> (f i, [], [], arr f)
     (***) a b = widget runWidget'
       where
-        runWidget' g = (pa ++ pb, runWidget'')
+        runWidget' g bs ~(ia, ib) = ((oa, ob), pa ++ pb, ra ++ rb, a' *** b')
           where
-            (pa, a') = runWidget a g
-            (pb, b') = runWidget b g
-            runWidget'' (ia, ib) bs = ((oa, ob), ra ++ rb, a'' *** b'')
-              where
-                (oa, ra, a'') = a' ia bs
-                (ob, rb, b'') = b' ib bs
+            ~(oa, pa, ra, a') = runWidget a g (take (length pa) bs) ia
+            ~(ob, pb, rb, b') = runWidget b g (drop (length pa) bs) ib
 
 instance ArrowLoop (Widget g r p) where
     loop a = widget runWidget'
       where
-        runWidget' g = (p, runWidget'')
+        runWidget' g bs i = (o, p, r, loop a')
           where
-            (p, a') = runWidget a g
-            runWidget'' i bs = (o, r, loop a'')
-              where
-                ((o, s), r, a'') = a' (i, s) bs
+            ~(~(o, s), p, r, a') = runWidget a g bs (i, s)

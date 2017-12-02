@@ -4,14 +4,21 @@ module Input
     , MouseButton
     , ButtonState(..)
     , Event(..)
+    , Globals(..)
     , mouseListener
     , focusListener
     ) where
 
+import Control.Applicative
 import Graphics.UI.GLFW (Key(..))
 import Layout
 import Types
 import Widget
+
+data Globals = Globals
+    { gEvents :: [Event]
+    , gTime :: Integer
+    }
 
 data KeyState
     = KeyUp
@@ -31,33 +38,37 @@ data Event
                  ButtonState
                  Coords
     | MouseMoveEvent Coords
-    | Time Integer
 
 mouseListener ::
-       (Monoid r)
-    => Widget Event r LayoutParam () (Maybe (MouseButton, ButtonState))
+       (Monoid r, Alternative o)
+    => Widget Globals r LayoutParam () (o (MouseButton, ButtonState))
 mouseListener =
-    buildWidget $ \e ->
-        ( stdParams {pWeightX = Just 1, pWeightY = Just 1}
-        , \_ bs -> (f e bs, mempty, mouseListener))
+    buildWidget $ \g bs _ ->
+        ( foldl (<|>) empty (map (f bs) (gEvents g))
+        , stdParams {pWeightX = Just 1, pWeightY = Just 1}
+        , mempty
+        , mouseListener)
   where
-    f e bs =
+    f bs e =
         case e of
             MouseEvent but butS coords ->
                 if coords `inside` bs
-                    then Just (but, butS)
-                    else Nothing
-            _ -> Nothing
+                    then pure (but, butS)
+                    else empty
+            _ -> empty
 
-focusListener :: (Monoid r) => Widget Event r LayoutParam () Bool
+focusListener :: (Monoid r) => Widget Globals r LayoutParam () Bool
 focusListener = focusListener' False
   where
-    focusListener' f =
-        buildWidget $ \e ->
-            ( stdParams {pWeightX = Just 1, pWeightY = Just 1}
-            , \_ bs -> (f' e bs, mempty, focusListener' $ f' e bs))
+    focusListener' focus =
+        buildWidget $ \g bs _ ->
+            (let focus' = foldl (f' bs) focus $ gEvents g
+             in ( focus'
+                , stdParams {pWeightX = Just 1, pWeightY = Just 1}
+                , mempty
+                , focusListener' focus'))
       where
-        f' e bs =
+        f' bs focus' e =
             case e of
                 MouseEvent _but ButtonDown coords -> coords `inside` bs
-                _ -> f
+                _ -> focus

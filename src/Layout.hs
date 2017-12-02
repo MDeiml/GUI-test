@@ -61,13 +61,17 @@ noLayout =
 widgetLayout :: (Eq p1) => Layout' p1 p2 -> Layout p1 p2 g i o
 widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
-    runWidget' w0 mbs g = (p, runWidget'')
+    runWidget' w0 mbs g bs i =
+        ( o
+        , p
+        , concat rs
+        , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs'))
       where
-        (ps, w') = runWidget w0 g
-        (calcBounds, p) =
+        ~(o, ps, rs, w') = runWidget w0 g bs' i
+        ~(calcBounds, p) =
             case mbs of
                 Nothing -> f ps
-                Just (ps', p', cb, b, bs) ->
+                Just ~(ps', p', cb, b, bs) ->
                     if ps' == ps
                         then ( \x ->
                                    if x == b
@@ -75,13 +79,7 @@ widgetLayout f w = buildWidget $ runWidget' w Nothing
                                        else cb x
                              , p')
                         else f ps
-        runWidget'' i bs =
-            ( o
-            , concat rs
-            , buildWidget $ runWidget' w'' $ Just (ps, p, calcBounds, bs, bs'))
-          where
-            bs' = calcBounds bs
-            (o, rs, w'') = w' i bs'
+        bs' = calcBounds bs
 
 stackLayout ::
        Margin

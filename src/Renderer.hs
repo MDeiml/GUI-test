@@ -1,8 +1,12 @@
 module Renderer
     ( mainLoop
     , Renderer(..)
+    , Globals(..)
+    , App
+    , Widget'
     ) where
 
+import Control.Concurrent
 import Control.Monad (unless, when)
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Drawable
@@ -11,27 +15,36 @@ import Layout
 import Types
 import Widget
 
-mainLoop ::
-       (Renderer r) => r -> Widget Event [Drawable] LayoutParam () o -> IO ()
-mainLoop r w = do
-    (width, height) <- getSize r
-    events <- pollEvents r
-    time <- fmap (round . (* 1000)) getPOSIXTime
-    let ws =
-            map (\e x -> (snd $ runWidget x e) () [Bounds 0 0 width height]) $
-            Time time : events
-        (w', a) =
-            foldl
-                (\(x, _a) f ->
-                     let (_o, a, x') = f x
-                     in (x', a))
-                (w, undefined)
-                ws
-    clear r
-    mapM_ (render r) $ reverse $ concat a
-    swapBuffers r
-    c <- closing r
-    unless c $ mainLoop r w'
+type App = Widget Globals [Drawable] LayoutParam () ()
+
+type Widget' i o = Widget Globals [Drawable] LayoutParam i o
+
+mainLoop :: (Renderer r) => r -> Int -> App -> IO ()
+mainLoop r fps w0 = do
+    next <- getPOSIXTime
+    mainLoop' w0 next
+  where
+    mainLoop' w next = do
+        now <- getPOSIXTime
+        if now >= next
+            then do
+                (width, height) <- getSize r
+                events <- pollEvents r
+                let (_, _, ds, w') =
+                        runWidget
+                            w
+                            Globals
+                            {gEvents = events, gTime = round $ next * 1000}
+                            [Bounds 0 0 width height]
+                            ()
+                clear r
+                mapM_ (render r) $ reverse $ concat ds
+                swapBuffers r
+                c <- closing r
+                unless c $ mainLoop' w' (next + 1 / fromIntegral fps)
+            else do
+                threadDelay 1000
+                mainLoop' w next
 
 class Renderer r where
     create :: String -> (Int, Int) -> IO r
