@@ -13,6 +13,10 @@ data Drawable t
                 (Shape t)
     | Image t
             Bounds
+    | NinePatch t
+                (Float, Float, Float, Float)
+                Bounds
+                Bounds
     deriving (Show, Eq)
 
 data Color =

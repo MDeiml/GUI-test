@@ -3,14 +3,20 @@ module Resources
     , ResourceId(..)
     , Resources
     , Font(..)
+    , Sprite(..)
     ) where
 
 import qualified Data.Map as M
 
 data Resource t
     = RFont (Font t)
-    | RImg t
+    | RSpr (Sprite t)
     | Error String
+
+data Sprite t =
+    Sprite t
+           Int
+           Int
 
 data Font t = Font
     { glyphs :: Integer -> t
@@ -24,7 +30,7 @@ data Font t = Font
 data ResourceId
     = ResF Int
            String
-    | ResI FilePath
+    | ResS FilePath
     deriving (Eq, Ord, Show)
 
 type Resources t = M.Map ResourceId (Resource t)

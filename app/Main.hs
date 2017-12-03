@@ -4,8 +4,6 @@ module Main where
 import Control.Arrow
 import GLFWRenderer
 import Lib
-import Font
-import Components
 
 test1 :: App t
 test1 = proc _ -> do

@@ -41,10 +41,10 @@ color r g b =
              (realToFrac b / 255)
              1 :: GL.Color4 GL.GLdouble)
 
-vertex :: Float -> Float -> Float -> IO ()
-vertex x y z =
+vertex :: Float -> Float -> IO ()
+vertex x y =
     GL.vertex
-        (GL.Vertex3 (realToFrac x) (realToFrac y) (realToFrac z) :: GL.Vertex3 GL.GLdouble)
+        (GL.Vertex3 (realToFrac x) (realToFrac y) 0 :: GL.Vertex3 GL.GLdouble)
 
 texCoord :: Float -> Float -> IO ()
 texCoord x y =
@@ -139,22 +139,104 @@ instance Renderer GLFWRenderer Texture where
         GL.textureBinding GL.Texture2D $= Nothing
         GL.renderPrimitive GL.Quads $ do
             color r g b
-            vertex x0 y0 0
-            vertex x1 y0 0
-            vertex x1 y1 0
-            vertex x0 y1 0
+            vertex x0 y0
+            vertex x1 y0
+            vertex x1 y1
+            vertex x0 y1
     render re (Image (Texture (tex, u0, v0, u1, v1)) (Bounds x0 y0 x1 y1)) = do
         renderInit re $ defaultShader re
         GL.textureBinding GL.Texture2D $= Just tex
         GL.renderPrimitive GL.Quads $ do
             texCoord u0 v0
-            vertex x0 y0 0
+            vertex x0 y0
             texCoord u1 v0
-            vertex x1 y0 0
+            vertex x1 y0
             texCoord u1 v1
-            vertex x1 y1 0
+            vertex x1 y1
             texCoord u0 v1
-            vertex x0 y1 0
+            vertex x0 y1
+    render re (NinePatch (Texture (tex, u0, v0, u1, v1)) (us', vs', ue', ve') (Bounds x0 y0 x1 y1) (Bounds xs ys xe ye)) = do
+        renderInit re $ defaultShader re
+        GL.textureBinding GL.Texture2D $= Just tex
+        let w = u1 - u0
+            h = v1 - v0
+            us = u0 + us' * w
+            ue = u0 + ue' * w
+            vs = v0 + vs' * h
+            ve = v0 + ve' * h
+        GL.renderPrimitive GL.Quads $ do
+            texCoord u0 v0 -- Left Bottom
+            vertex x0 y0
+            texCoord us v0
+            vertex xs y0
+            texCoord us vs
+            vertex xs ys
+            texCoord u0 vs
+            vertex x0 ys
+            texCoord us v0 -- Bottom
+            vertex xs y0
+            texCoord ue v0
+            vertex xe y0
+            texCoord ue vs
+            vertex xe ys
+            texCoord us vs
+            vertex xs ys
+            texCoord ue v0 -- Bottom Right
+            vertex xe y0
+            texCoord u1 v0
+            vertex x1 y0
+            texCoord u1 vs
+            vertex x1 ys
+            texCoord ue vs
+            vertex xe ys
+            texCoord u0 vs -- Left
+            vertex x0 ys
+            texCoord us vs
+            vertex xs ys
+            texCoord us ve
+            vertex xs ye
+            texCoord u0 ve
+            vertex x0 ye
+            texCoord us vs -- Center
+            vertex xs ys
+            texCoord ue vs
+            vertex xe ys
+            texCoord ue ve
+            vertex xe ye
+            texCoord us ve
+            vertex xs ye
+            texCoord ue vs -- Right
+            vertex xe ys
+            texCoord u1 vs
+            vertex x1 ys
+            texCoord u1 ve
+            vertex x1 ye
+            texCoord ue ve
+            vertex xe ye
+            texCoord u0 ve -- Left Top
+            vertex x0 ye
+            texCoord us ve
+            vertex xs ye
+            texCoord us v1
+            vertex xs y1
+            texCoord u0 v1
+            vertex x0 y1
+            texCoord us ve -- Top
+            vertex xs ye
+            texCoord ue ve
+            vertex xe ye
+            texCoord ue v1
+            vertex xe y1
+            texCoord us v1
+            vertex xs y1
+            texCoord ue ve -- Top Right
+            vertex xe ye
+            texCoord u1 ve
+            vertex x1 ye
+            texCoord u1 v1
+            vertex x1 y1
+            texCoord ue v1
+            vertex xe y1
     render re (DrawShape (Color r g b) (Text text (Coords x y) f)) = do
         renderInit re (fontShader re)
         let Texture (tex, _, _, _, _) =
@@ -183,13 +265,13 @@ instance Renderer GLFWRenderer Texture where
                                      round $ y' + fromIntegral (ascent f) - by
                                  x'' = fromIntegral $ round $ x' + bx
                              texCoord x0 y0
-                             vertex x'' y'' 0
+                             vertex x'' y''
                              texCoord x1 y0
-                             vertex (x'' + w) y'' 0
+                             vertex (x'' + w) y''
                              texCoord x1 y1
-                             vertex (x'' + w) (y'' + h) 0
+                             vertex (x'' + w) (y'' + h)
                              texCoord x0 y1
-                             vertex x'' (y'' + h) 0
+                             vertex x'' (y'' + h)
                              return (x' + a, y'))
                 (x, y)
                 text
@@ -210,7 +292,7 @@ instance Renderer GLFWRenderer Texture where
     loadResource re (ResF size fontname) = do
         G.makeContextCurrent $ Just $ window re
         RFont <$> generateAtlas fontname size
-    loadResource re (ResI fp) = do
+    loadResource re (ResS fp) = do
         img <- P.readImage fp
         case img of
             Left s -> return $ Error s
@@ -223,15 +305,15 @@ instance Renderer GLFWRenderer Texture where
         loadImage img internal format datatype =
             unsafeWith (P.imageData img) $ \buf -> do
                 tex <- GL.genObjectName
+                let w = P.imageWidth img
+                    h = P.imageHeight img
                 GL.textureBinding GL.Texture2D $= Just tex
                 GL.texImage2D
                     GL.Texture2D
                     GL.NoProxy
                     0
                     internal
-                    (GL.TextureSize2D
-                         (fromIntegral $ P.imageWidth img)
-                         (fromIntegral $ P.imageHeight img))
+                    (GL.TextureSize2D (fromIntegral w) (fromIntegral h))
                     0
                     (GL.PixelData format datatype buf)
                 GL.textureFilter GL.Texture2D $=
@@ -240,4 +322,4 @@ instance Renderer GLFWRenderer Texture where
                     (GL.Repeated, GL.ClampToEdge)
                 GL.textureWrapMode GL.Texture2D GL.T $=
                     (GL.Repeated, GL.ClampToEdge)
-                return $ RImg $ Texture (tex, 0, 0, 1, 1)
+                return $ RSpr $ Sprite (Texture (tex, 0, 0, 1, 1)) w h

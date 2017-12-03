@@ -5,8 +5,10 @@ module Lib
     , module Types
     , module Renderer
     , module Input
+    , module Components
     ) where
 
+import Components
 import Drawable
 import Input
 import Layout

@@ -55,6 +55,9 @@ resource = proc i -> do
     g <- globals -< ()
     returnA -< fromJust $ M.lookup i $ gResources g
 
+image :: Widget g (Cmd t) LayoutParam (Sprite t) ()
+image = proc (Sprite t w h) -> widgetOutput -< (stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, \bs -> [Render $ Image t bs])
+
 globals :: Widget g r p () g
 globals = buildWidget' $ \g _ -> (g, globals)
 
