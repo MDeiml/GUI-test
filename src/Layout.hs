@@ -3,9 +3,13 @@ module Layout
     , Orientation(..)
     , Align(..)
     , Layout
+    , Weight
     , widgetLayout
     , linearLayout
     , tableLayout
+    , widgetLayout'
+    , linearLayout'
+    , tableLayout'
     , noLayout
     , stackLayout
     , stdParams
@@ -17,7 +21,9 @@ import Drawable
 import Types
 import Widget
 
-type Layout' p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
+type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
+
+type Layout' p1 p2 g r i o a = Widget g r p1 i (a, o) -> Widget g r p2 i o
 
 type Layout p1 p2 g d i o = Widget g d p1 i o -> Widget g d p2 i o
 
@@ -51,7 +57,17 @@ noLayout =
     widgetLayout $ \ps ->
         (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
-widgetLayout :: (Eq p1) => Layout' p1 p2 -> Layout p1 p2 g d i o
+widgetLayout' ::
+       (a -> Layout1 p1 p2) -> Widget g r p1 i (a, o) -> Widget g r p2 i o
+widgetLayout' f a = buildWidget runWidget'
+  where
+    runWidget' g bs i = (o, p, rs, widgetLayout' f a')
+      where
+        ((oa, o), ps, rs, a') = runWidget a g bs' i
+        (calcBounds, p) = f oa ps
+        bs' = calcBounds bs
+
+widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2 g d i o
 widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
     runWidget' w0 mbs g bs i =
@@ -80,14 +96,20 @@ stackLayout ::
     -> (Align, Align)
     -> (Weight, Weight)
     -> Layout LayoutParam LayoutParam g d i o
-stackLayout m a l = widgetLayout $ stackLayout' m a l
+stackLayout m a l = widgetLayout $ stackLayout1 m a l
 
 stackLayout' ::
+       Layout' LayoutParam LayoutParam g d i o ( Margin
+                                               , (Align, Align)
+                                               , (Weight, Weight))
+stackLayout' = widgetLayout' $ \(a, b, c) -> stackLayout1 a b c
+
+stackLayout1 ::
        Margin
     -> (Align, Align)
     -> (Weight, Weight)
-    -> Layout' LayoutParam LayoutParam
-stackLayout' (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
+    -> Layout1 LayoutParam LayoutParam
+stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
     (\bs -> map (calcBounds bs) ps, param)
   where
     pw = mr + ml + pWidth (head ps)
@@ -122,11 +144,15 @@ stackLayout' (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
 
 linearLayout ::
        Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam g d i o
-linearLayout o l = widgetLayout $ linearLayout' o l
+linearLayout o l = widgetLayout $ linearLayout1 o l
 
 linearLayout' ::
-       Orientation -> (Weight, Weight) -> Layout' LayoutParam LayoutParam
-linearLayout' o (lx, ly) ps = (calcBounds, param)
+       Layout' LayoutParam LayoutParam g d i o (Orientation, (Weight, Weight))
+linearLayout' = widgetLayout' $ uncurry linearLayout1
+
+linearLayout1 ::
+       Orientation -> (Weight, Weight) -> Layout1 LayoutParam LayoutParam
+linearLayout1 o (lx, ly) ps = (calcBounds, param)
   where
     totalX = sum $ map pWidth ps
     totalY = sum $ map pHeight ps
@@ -176,10 +202,13 @@ linearLayout' o (lx, ly) ps = (calcBounds, param)
 --     tpLayoutParam :: LayoutParam
 -- }
 tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam g d i o
-tableLayout colwidth l = widgetLayout $ tableLayout' colwidth l
+tableLayout colwidth l = widgetLayout $ tableLayout1 colwidth l
 
-tableLayout' :: Int -> (Weight, Weight) -> Layout' LayoutParam LayoutParam
-tableLayout' colwidth (lx, ly) ps = (calcBounds, param)
+tableLayout' :: Layout' LayoutParam LayoutParam g d i o (Int, (Weight, Weight))
+tableLayout' = widgetLayout' $ uncurry tableLayout1
+
+tableLayout1 :: Int -> (Weight, Weight) -> Layout1 LayoutParam LayoutParam
+tableLayout1 colwidth (lx, ly) ps = (calcBounds, param)
   where
     ps' = reformat ps
     reformat [] = []

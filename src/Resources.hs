@@ -4,6 +4,7 @@ module Resources
     , Resources
     , Font(..)
     , Sprite(..)
+    , NinePatch(..)
     ) where
 
 import qualified Data.Map as M
@@ -11,12 +12,14 @@ import qualified Data.Map as M
 data Resource t
     = RFont (Font t)
     | RSpr (Sprite t)
+    | RNin (NinePatch t)
     | Error String
 
 data Sprite t =
     Sprite t
            Int
            Int
+    deriving (Show, Eq)
 
 data Font t = Font
     { glyphs :: Integer -> t
@@ -27,10 +30,16 @@ data Font t = Font
     , fontsize :: Int
     }
 
+data NinePatch t =
+    NP (Sprite t)
+       (Float, Float, Float, Float)
+    deriving (Show, Eq)
+
 data ResourceId
     = ResF Int
            String
     | ResS FilePath
+    | ResN FilePath
     deriving (Eq, Ord, Show)
 
 type Resources t = M.Map ResourceId (Resource t)

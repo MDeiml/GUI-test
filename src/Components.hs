@@ -58,6 +58,18 @@ resource = proc i -> do
 image :: Widget g (Cmd t) LayoutParam (Sprite t) ()
 image = proc (Sprite t w h) -> widgetOutput -< (stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, \bs -> [Render $ Image t bs])
 
+-- textfield :: (Weight, Weight) -> Widget' t String String
+-- textfield (wx, wy) = stackLayout (0,0,0,0) (AlignCenter, AlignCenter) (wx, wy) $ proc content -> do
+--     RNin np <- resource -< ResN "textfield.json"
+--     let NP (Sprite _ w h) (xs, ys, xe, ye) = np
+--         x0 = fromIntegral w * xs
+--         y0 = fromIntegral h * ys
+--         x1 = fromIntegral w * (1 - xe)
+--         y1 = fromIntegral h * (1 - ye)
+--     stackLayout (x0,y0,x1,y1) (AlignCenter, AlignCenter) (wx, wy) $ label' -< content
+--     widgetOutput -< (stdParams {pWeightX = wx, pWeightY = wy}, \b@(Bounds x0' y0' x1' y1') -> [Render $ NinePatch np b $ Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
+--     returnA -< content
+
 globals :: Widget g r p () g
 globals = buildWidget' $ \g _ -> (g, globals)
 

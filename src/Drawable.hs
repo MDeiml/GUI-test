@@ -13,8 +13,7 @@ data Drawable t
                 (Shape t)
     | Image t
             Bounds
-    | NinePatch t
-                (Float, Float, Float, Float)
+    | NinePatch (NinePatch t)
                 Bounds
                 Bounds
     deriving (Show, Eq)

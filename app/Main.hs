@@ -43,9 +43,15 @@ test4 = stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $ p
     widgetOutput -< (stdParams, (:[]) . Render . DrawShape (Color 255 0 0) . Rect)
     background (Color 255 255 255) -< ()
 
+test5 :: App t
+test5 = stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $ proc _ -> do
+    _ <- textfield stdParams { pHeight = 30, pWidth = 100 } -< ()
+    background (Color 0 255 255) -< ()
+    returnA -< ()
+
 test :: IO ()
 test = do
     r <- create "Test" (800,600) :: IO GLFWRenderer
-    mainLoop r 15 test4
+    mainLoop r 15 test5
 
 main = test

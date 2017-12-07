@@ -1,7 +1,5 @@
 # gui-test
 
-## TODO
-
 * More Drawables?
     * Lines
     * Rectangle outlines (~ lines)

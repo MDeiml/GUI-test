@@ -9,9 +9,11 @@ module GLFWRenderer
 import qualified Codec.Picture as P
 import Control.Arrow ((***))
 import Control.Monad
+import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.IORef
 import qualified Data.Map as M
+import Data.Maybe
 import Data.Vector.Storable (unsafeWith)
 import Data.Word
 import Drawable
@@ -147,6 +149,7 @@ instance Renderer GLFWRenderer Texture where
         renderInit re $ defaultShader re
         GL.textureBinding GL.Texture2D $= Just tex
         GL.renderPrimitive GL.Quads $ do
+            color 0 0 0
             texCoord u0 v0
             vertex x0 y0
             texCoord u1 v0
@@ -155,7 +158,7 @@ instance Renderer GLFWRenderer Texture where
             vertex x1 y1
             texCoord u0 v1
             vertex x0 y1
-    render re (NinePatch (Texture (tex, u0, v0, u1, v1)) (us', vs', ue', ve') (Bounds x0 y0 x1 y1) (Bounds xs ys xe ye)) = do
+    render re (NinePatch (NP (Sprite (Texture (tex, u0, v0, u1, v1)) _ _) (us', vs', ue', ve')) (Bounds x0 y0 x1 y1) (Bounds xs ys xe ye)) = do
         renderInit re $ defaultShader re
         GL.textureBinding GL.Texture2D $= Just tex
         let w = u1 - u0
@@ -165,6 +168,7 @@ instance Renderer GLFWRenderer Texture where
             vs = v0 + vs' * h
             ve = v0 + ve' * h
         GL.renderPrimitive GL.Quads $ do
+            color 0 0 0
             texCoord u0 v0 -- Left Bottom
             vertex x0 y0
             texCoord us v0
@@ -292,6 +296,8 @@ instance Renderer GLFWRenderer Texture where
     loadResource re (ResF size fontname) = do
         G.makeContextCurrent $ Just $ window re
         RFont <$> generateAtlas fontname size
+    loadResource re (ResN fp) =
+        maybe (Error "") RNin <$> runMaybeT (loadNinpatch re fp)
     loadResource re (ResS fp) = do
         img <- P.readImage fp
         case img of
