@@ -7,6 +7,8 @@ module Components
     , initial
     , evLast
     , evLast'
+    , debug
+    , globals
     ) where
 
 import Control.Applicative
@@ -21,20 +23,24 @@ import Types
 import Widget
 import qualified Data.Map as M
 
-background :: Color -> Widget g (Cmd t) LayoutParam () ()
+debug :: Widget g (Cmd t) p String ()
+debug = widgetOutput' <<< arr ((:[]) . Debug)
+
+background :: Color -> Widget g (Cmd t) (LayoutParam, Bool) () ()
 background c =
     widgetOutput <<<
     arr
         (const
-             ( stdParams {pWeightX = Just 0, pWeightY = Just 0}
+             ( (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
              , (: []) . Render . DrawShape c . Rect))
 
 label ::
-       Color -> Widget a (Cmd t) LayoutParam (Font t, String) ()
+       Color -> Widget a (Cmd t) (LayoutParam, Bool) (Font t, String) ()
 label c = proc (f, s) -> do
+    s' <- shift Nothing -< Just s
     let w = fromIntegral $ sum $ map ((\(_,_,_,_,x) -> x) . fontMetrics f . fromIntegral . fromEnum) s
         h = fromIntegral (ascent f - descent f) + 1.2 * count '\n' s
-    widgetOutput -< ( stdParams { pHeight = h, pWidth = w }
+    widgetOutput -< ( (stdParams { pHeight = h, pWidth = w }, Just s /= s') -- TODO
              , \(Bounds x y _ _) ->
                    [Render $ DrawShape c $ Text s (Coords x y) f])
     where
@@ -45,18 +51,19 @@ label c = proc (f, s) -> do
 
 label' :: LayoutParam -> Int -> Widget' t String ()
 label' p size = proc s -> do
-    r <- resource -< ResF size "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf"
+    r <- resource -< ResF size "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
     case r of
-      (RFont f) -> label (Color 0 0 0) -< (f, s)
+      Just (RFont f) -> label (Color 0 0 0) -< (f, s)
+      _ -> returnA -< ()
 
-resource :: Widget (Globals t) (Cmd t) p ResourceId (Resource t)
+resource :: Widget (Globals t) (Cmd t) p ResourceId (Maybe (Resource t))
 resource = proc i -> do
     widgetOutput' -< [LoadResource i]
     g <- globals -< ()
-    returnA -< fromJust $ M.lookup i $ gResources g
+    returnA -< M.lookup i $ gResources g
 
-image :: Widget g (Cmd t) LayoutParam (Sprite t) ()
-image = proc (Sprite t w h) -> widgetOutput -< (stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, \bs -> [Render $ Image t bs])
+image :: Widget g (Cmd t) (LayoutParam, Bool) (Sprite t) ()
+image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, True), \bs -> [Render $ Image t bs]) -- TODO
 
 -- textfield :: (Weight, Weight) -> Widget' t String String
 -- textfield (wx, wy) = stackLayout (0,0,0,0) (AlignCenter, AlignCenter) (wx, wy) $ proc content -> do

@@ -87,6 +87,7 @@ renderInit re shader = do
 
 instance Renderer GLFWRenderer Texture where
     create title (w, h) = do
+        print 2
         _ <- G.init
         win <- G.createWindow w h title Nothing Nothing
         maybe

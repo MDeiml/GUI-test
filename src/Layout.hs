@@ -23,9 +23,9 @@ import Widget
 
 type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
-type Layout' p1 p2 g r i o a = Widget g r p1 i (a, o) -> Widget g r p2 i o
+type Layout' p1 p2 g r i o a = Widget g r (p1, Bool) i (a, o) -> Widget g r (p2, Bool) i o
 
-type Layout p1 p2 g d i o = Widget g d p1 i o -> Widget g d p2 i o
+type Layout p1 p2 g d i o = Widget g d (p1, Bool) i o -> Widget g d (p2, Bool) i o
 
 type Weight = Maybe Float
 
@@ -58,13 +58,13 @@ noLayout =
         (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
 widgetLayout' ::
-       (a -> Layout1 p1 p2) -> Widget g r p1 i (a, o) -> Widget g r p2 i o
+       (a -> Layout1 p1 p2) -> Layout' p1 p2 g r i o a -- Widget g r p1 i (a, o) -> Widget g r p2 i o
 widgetLayout' f a = buildWidget runWidget'
   where
-    runWidget' g bs i = (o, p, rs, widgetLayout' f a')
+    runWidget' g bs i = (o, (p, True), rs, widgetLayout' f a')
       where
         ((oa, o), ps, rs, a') = runWidget a g bs' i
-        (calcBounds, p) = f oa ps
+        (calcBounds, p) = f oa $ map (\ ~(x,_) -> x) ps
         bs' = calcBounds bs
 
 widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2 g d i o
@@ -72,23 +72,25 @@ widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
     runWidget' w0 mbs g bs i =
         ( o
-        , p
+        , (p, reval')
         , rs
-        , buildWidget $ runWidget' w' Nothing -- TODO $ Just (ps, p, calcBounds, bs, bs'))
+        , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs')
          )
       where
-        ~(o, ps, rs, w') = runWidget w0 g bs' i
-        ~(calcBounds, p) =
+        ~(o, ps0, rs, w') = runWidget w0 g bs' i
+        ps = map (\ ~(x,_) -> x) ps0
+        reval = any (\ ~(_,x) -> x) ps0
+        ~(~(calcBounds, p), reval') = 
             case mbs of
-                Nothing -> f ps
+                Nothing -> (f ps, True)
                 Just ~(ps', p', cb, b, bs) ->
-                    if ps' == ps
-                        then ( \x ->
+                    if not reval
+                        then (( \x ->
                                    if x == b
                                        then bs
                                        else cb x
-                             , p')
-                        else f ps
+                              , p'), False)
+                        else (f ps, True)
         bs' = calcBounds bs
 
 stackLayout ::
@@ -125,11 +127,11 @@ stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
         bs = Bounds (xs + x0) (ys + y0) (xs + x0 + width) (ys + y0 + height)
         width =
             case pWeightX p of
-                Nothing -> pw
+                Nothing -> pWidth (head ps)
                 Just _ -> x1 - x0
         height =
             case pWeightY p of
-                Nothing -> ph
+                Nothing -> pHeight (head ps)
                 Just _ -> y1 - y0
         xs =
             case ax of

@@ -1,5 +1,4 @@
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -9,8 +8,6 @@ module Renderer
     , Renderer(..)
     , Globals(..)
     , App
-    , Widget'
-    , Cmd(..)
     ) where
 
 import Control.Monad.Trans.Maybe
@@ -31,12 +28,6 @@ import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BS
 
 type App t = Widget' t () ()
-
-type Widget' t i o = Widget (Globals t) (Cmd t) LayoutParam i o
-
-data Cmd t
-    = LoadResource ResourceId
-    | Render (Drawable t)
 
 loadResource' ::
        (Renderer r t) => r -> Resources t -> ResourceId -> IO (Resources t)
@@ -67,22 +58,26 @@ mainLoop r fps w0 = do
                 (width, height) <- getSize r
                 events <- pollEvents r
                 clear r
-                rec let ~(_, _, ds, w') =
+                let ~(_, ps, ds, w') =
                             runWidget
                                 w
                                 Globals
                                 { gEvents = events
                                 , gTime = round $ next * 1000
-                                , gResources = res'
+                                , gResources = res
                                 }
                                 [Bounds 0 0 width height]
                                 ()
-                    res' <- loadResources r res $ mapMaybe (\case
-                          LoadResource i -> Just i
-                          _ -> Nothing) ds
+                print $ any snd ps
+                res' <- loadResources r res $ mapMaybe (\case
+                      LoadResource i -> Just i
+                      _ -> Nothing) ds
                 mapM_ (render r) $ mapMaybe (\case
                           Render d -> Just d
                           _ -> Nothing) $ reverse ds
+                mapM_ putStrLn $ mapMaybe (\case
+                          Debug s -> Just s
+                          _ -> Nothing) ds
                 swapBuffers r
                 c <- closing r
                 unless c $ mainLoop' w' res' (next + 1 / fromIntegral fps)
