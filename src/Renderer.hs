@@ -1,6 +1,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Renderer
     ( mainLoop
@@ -26,6 +27,7 @@ import Widget
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BS
+import Data.Functor.Identity
 
 type App t = Widget' t () ()
 
@@ -59,7 +61,7 @@ mainLoop r fps w0 = do
                 events <- pollEvents r
                 clear r
                 let ~(_, ps, ds, w') =
-                            runWidget
+                        runIdentity $ runWidget
                                 w
                                 Globals
                                 { gEvents = events

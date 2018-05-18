@@ -1,3 +1,4 @@
+{-# LANGUAGE RecursiveDo #-}
 module Widget
     ( Widget
     , runWidget
@@ -8,74 +9,75 @@ module Widget
     , shift
     ) where
 
+import Control.Monad.Fix
 import Control.Arrow
 import Control.Category
 import Prelude hiding ((.), id)
 import Types
 
-newtype Widget g r p i o = Widget
-    { runWidget1 :: g -> [Bounds] -> i -> (o, [p], [r], Widget g r p i o)
+newtype Widget g r p m i o = Widget
+    { runWidget1 :: g -> [Bounds] -> i -> m (o, [p], [r], Widget g r p m i o)
     }
 
 runWidget = runWidget1
 
 widget ::
-       (g -> [Bounds] -> i -> (o, [p], [r], Widget g r p i o))
-    -> Widget g r p i o
+       MonadFix m => (g -> [Bounds] -> i -> m (o, [p], [r], Widget g r p m i o))
+    -> Widget g r p m i o
 widget = Widget
 
 buildWidget ::
-       (g -> Bounds -> i -> (o, p, [r], Widget g r p i o)) -> Widget g r p i o
+       MonadFix m => (g -> Bounds -> i -> m (o, p, [r], Widget g r p m i o)) -> Widget g r p m i o
 buildWidget f = widget runWidget'
   where
-    runWidget' g bs i = (o, [p], r, w)
-      where
-        ~(o, p, r, w) = f g (head bs) i
+    runWidget' g bs i = do
+        ~(o, p, r, w) <- f g (head bs) i
+        return (o, [p], r, w)
 
-buildWidget' :: (g -> i -> (o, Widget g r p i o)) -> Widget g r p i o
+buildWidget' :: MonadFix m => (g -> i -> m (o, Widget g r p m i o)) -> Widget g r p m i o
 buildWidget' f =
-    widget $ \g _ i ->
-        let (o, w) = f g i
-        in (o, [], [], w)
+    widget $ \g _ i -> do
+        (o, w) <- f g i
+        return (o, [], [], w)
 
-widgetOutput :: Widget g r p (p, Bounds -> [r]) ()
-widgetOutput = widget $ \_ bs (p, r) -> ((), [p], r $ head bs, widgetOutput)
+widgetOutput :: MonadFix m => Widget g r p m (p, Bounds -> [r]) ()
+widgetOutput = widget $ \_ bs (p, r) -> return ((), [p], r $ head bs, widgetOutput)
 
-widgetOutput' :: Widget g r p [r] ()
-widgetOutput' = widget $ \_ _ r -> ((), [], r, widgetOutput')
+widgetOutput' :: MonadFix m => Widget g r p m [r] ()
+widgetOutput' = widget $ \_ _ r -> return ((), [], r, widgetOutput')
 
-shift :: a -> Widget g r p a a
-shift x = widget $ \_ _ last -> (x, [], [], shift last)
+shift :: MonadFix m => a -> Widget g r p m a a
+shift x = widget $ \_ _ last -> return (x, [], [], shift last)
 
-instance Category (Widget g r p) where
-    id = widget $ \_ _ i -> (i, [], [], id)
+instance MonadFix m => Category (Widget g r p m) where
+    id = widget $ \_ _ i -> return (i, [], [], id)
     (.) a b = widget runWidget'
       where
-        runWidget' g bs i = (oa, pb ++ pa, rb ++ ra, a' . b')
-          where
-            ~(ob, pb, rb, b') = runWidget b g (take (length pb) bs) i
-            ~(oa, pa, ra, a') = runWidget a g (drop (length pb) bs) ob
+        runWidget' g bs i = do
+            rec ~(ob, pb, rb, b') <- runWidget b g (take (length pb) bs) i
+            ~(oa, pa, ra, a') <- runWidget a g (drop (length pb) bs) ob
+            return (oa, pb ++ pa, rb ++ ra, a' . b')
 
-instance Arrow (Widget g r p) where
-    arr f = widget $ \_ _ i -> (f i, [], [], arr f)
+instance MonadFix m => Arrow (Widget g r p m) where
+    arr f = widget $ \_ _ i -> return (f i, [], [], arr f)
     (***) a b = widget runWidget'
       where
-        runWidget' g bs ~(ia, ib) = ((oa, ob), pa ++ pb, ra ++ rb, a' *** b')
-          where
-            ~(oa, pa, ra, a') = runWidget a g (take (length pa) bs) ia
-            ~(ob, pb, rb, b') = runWidget b g (drop (length pa) bs) ib
+        runWidget' g bs ~(ia, ib) = do
+            rec ~(oa, pa, ra, a') <- runWidget a g (take (length pa) bs) ia
+            ~(ob, pb, rb, b') <- runWidget b g (drop (length pa) bs) ib
+            return ((oa, ob), pa ++ pb, ra ++ rb, a' *** b')
 
-instance ArrowLoop (Widget g r p) where
+instance MonadFix m => ArrowLoop (Widget g r p m) where
     loop a = widget runWidget'
       where
-        runWidget' g bs i = (o, p, r, loop a')
-          where
-            ~(~(o, s), p, r, a') = runWidget a g bs (i, s)
+        runWidget' g bs i = do
+            rec ~(~(o, s), p, r, a') <- runWidget a g bs (i, s)
+            return (o, p, r, loop a')
 
-instance ArrowChoice (Widget g r p) where
+instance MonadFix m => ArrowChoice (Widget g r p m) where
     left a = widget runWidget'
       where
-        runWidget' g bs (Left i) =
-            let (o, p, r, w) = runWidget a g bs i
-            in (Left o, p, r, left w)
-        runWidget' g bs (Right i) = (Right i, [], [], left a)
+        runWidget' g bs (Left i) = do
+            (o, p, r, w) <- runWidget a g bs i
+            return (Left o, p, r, left w)
+        runWidget' g bs (Right i) = return (Right i, [], [], left a)

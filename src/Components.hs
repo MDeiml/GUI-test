@@ -23,10 +23,10 @@ import Types
 import Widget
 import qualified Data.Map as M
 
-debug :: Widget g (Cmd t) p String ()
+debug :: Widget' t String ()
 debug = widgetOutput' <<< arr ((:[]) . Debug)
 
-background :: Color -> Widget g (Cmd t) (LayoutParam, Bool) () ()
+background :: Color -> Widget' t () ()
 background c =
     widgetOutput <<<
     arr
@@ -35,7 +35,7 @@ background c =
              , (: []) . Render . DrawShape c . Rect))
 
 label ::
-       Color -> Widget a (Cmd t) (LayoutParam, Bool) (Font t, String) ()
+       Color -> Widget' t (Font t, String) ()
 label c = proc (f, s) -> do
     s' <- shift Nothing -< Just s
     let w = fromIntegral $ sum $ map ((\(_,_,_,_,x) -> x) . fontMetrics f . fromIntegral . fromEnum) s
@@ -56,13 +56,13 @@ label' p size = proc s -> do
       Just (RFont f) -> label (Color 0 0 0) -< (f, s)
       _ -> returnA -< ()
 
-resource :: Widget (Globals t) (Cmd t) p ResourceId (Maybe (Resource t))
+resource :: Widget' t ResourceId (Maybe (Resource t))
 resource = proc i -> do
     widgetOutput' -< [LoadResource i]
     g <- globals -< ()
     returnA -< M.lookup i $ gResources g
 
-image :: Widget g (Cmd t) (LayoutParam, Bool) (Sprite t) ()
+image :: Widget' t (Sprite t) ()
 image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, True), \bs -> [Render $ Image t bs]) -- TODO
 
 -- textfield :: (Weight, Weight) -> Widget' t String String
@@ -77,25 +77,25 @@ image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegr
 --     widgetOutput -< (stdParams {pWeightX = wx, pWeightY = wy}, \b@(Bounds x0' y0' x1' y1') -> [Render $ NinePatch np b $ Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
 --     returnA -< content
 
-globals :: Widget g r p () g
-globals = buildWidget' $ \g _ -> (g, globals)
+globals :: Widget' t () (Globals t)
+globals = buildWidget' $ \g _ -> return (g, globals)
 
-initial :: Widget g r p a a
-initial = buildWidget' $ \_ i -> (i, arr $ const i)
+initial :: Widget' t a a
+initial = buildWidget' $ \_ i -> return (i, arr $ const i)
 
-evLast :: Widget g r p (Maybe a) (Maybe a)
+evLast :: Widget' t (Maybe a) (Maybe a)
 evLast = evLast1 Nothing
   where
     evLast1 s =
         buildWidget' $ \_ i ->
             let new = i <|> s
-            in (new, evLast1 new)
+             in return (new, evLast1 new)
 
-evLast' :: a -> Widget g r p (Maybe a) a
+evLast' :: a -> Widget' t (Maybe a) a
 evLast' x =
     buildWidget' $ \_ i ->
         let new = fromMaybe x i
-        in (new, evLast' new)
+         in return (new, evLast' new)
 
-time :: Widget (Globals t) r p () Integer
+time :: Widget' t () Integer
 time = arr gTime <<< globals
