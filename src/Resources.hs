@@ -13,7 +13,7 @@ data Resource t
     = RFont (Font t)
     | RSpr (Sprite t)
     | RNin (NinePatch t)
-    | Error String
+    | RError String
     deriving (Show)
 
 data Sprite t =

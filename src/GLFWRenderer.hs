@@ -18,6 +18,7 @@ import Data.Vector.Storable (unsafeWith)
 import Data.Word
 import Drawable
 import Font
+import GUI
 import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
 import qualified Graphics.UI.GLFW as G
@@ -298,11 +299,11 @@ instance Renderer GLFWRenderer Texture where
         G.makeContextCurrent $ Just $ window re
         RFont <$> generateAtlas fontname size
     loadResource re (ResN fp) =
-        maybe (Error "") RNin <$> runMaybeT (loadNinpatch re fp)
+        maybe (RError "") RNin <$> runMaybeT (loadNinpatch re fp)
     loadResource re (ResS fp) = do
         img <- P.readImage fp
         case img of
-            Left s -> return $ Error s
+            Left s -> return $ RError s
             Right img' ->
                 case img' of
                     P.ImageRGBA8 i ->

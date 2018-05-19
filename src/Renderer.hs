@@ -1,5 +1,4 @@
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 
@@ -18,6 +17,7 @@ import Control.Monad.Trans.Maybe
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BS
+import Data.IORef
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Time.Clock.POSIX (getPOSIXTime)
@@ -31,26 +31,25 @@ import Widget
 type App t = Widget' t () ()
 
 loadResource' ::
-       (Renderer r t) => r -> Resources t -> ResourceId -> IO (Resources t)
-loadResource' re res i =
-    if i `M.member` res
-        then return res
-        else do
-            print i
-            r <- loadResource re i
-            return $ M.insert i r res
-
-loadResources ::
-       (Renderer r t) => r -> Resources t -> [ResourceId] -> IO (Resources t)
-loadResources _ res [] = return res
-loadResources r res (i:is) = do
-    res' <- loadResource' r res i
-    loadResources r res' is
+       (Renderer r t)
+    => r
+    -> IORef (Resources t)
+    -> ResourceId
+    -> IO (Resource t)
+loadResource' r ress i = do
+    ress' <- readIORef ress
+    case M.lookup i ress' of
+        Just res -> return res
+        Nothing -> do
+            res <- loadResource r i
+            writeIORef ress $ M.insert i res ress'
+            return res
 
 mainLoop :: (Renderer r t) => r -> Int -> App t -> IO ()
 mainLoop r fps w0 = do
     next <- getPOSIXTime
-    mainLoop' w0 M.empty next
+    res <- newIORef M.empty
+    mainLoop' w0 res next
   where
     mainLoop' w res next = do
         now <- getPOSIXTime
@@ -59,37 +58,19 @@ mainLoop r fps w0 = do
                 (width, height) <- getSize r
                 events <- pollEvents r
                 clear r
-                let (GUI gui) = runWidget w [Bounds 0 0 width height] ()
+                let gui = runGUI $ runWidget w [Bounds 0 0 width height] ()
                 ~(~(_, ps, w'), ds) <-
                     gui
                         Globals
                         { gEvents = events
                         , gTime = round $ next * 1000
-                        , gResources = res
+                        , gResources = loadResource' r res
                         }
                 print $ any snd ps
-                res' <-
-                    loadResources r res $
-                    mapMaybe
-                        (\case
-                             LoadResource i -> Just i
-                             _ -> Nothing)
-                        ds
-                mapM_ (render r) $
-                    mapMaybe
-                        (\case
-                             Render d -> Just d
-                             _ -> Nothing) $
-                    reverse ds
-                mapM_ putStrLn $
-                    mapMaybe
-                        (\case
-                             Debug s -> Just s
-                             _ -> Nothing)
-                        ds
+                mapM_ (render r) $ reverse ds
                 swapBuffers r
                 c <- closing r
-                unless c $ mainLoop' w' res' (next + 1 / fromIntegral fps)
+                unless c $ mainLoop' w' res (next + 1 / fromIntegral fps)
             else do
                 threadDelay 1000
                 mainLoop' w res next

@@ -71,6 +71,6 @@ instance MonadFix m => ArrowChoice (Widget p m) where
     left a = widget runWidget'
       where
         runWidget' bs (Left i) = do
-            (o, p, w) <- runWidget a bs i
+            ~(o, p, w) <- runWidget a bs i
             return (Left o, p, left w)
         runWidget' bs (Right i) = return (Right i, [], left a)

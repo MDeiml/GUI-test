@@ -13,6 +13,8 @@ module Components
 
 import Control.Applicative
 import Control.Arrow
+import Control.Monad.IO.Class
+import Data.IORef
 import Data.Maybe
 import Drawable
 import Input
@@ -24,7 +26,9 @@ import GUI
 import qualified Data.Map as M
 
 debug :: Widget' t String ()
-debug = widgetOutput' <<< arr ((:[]) . Debug)
+debug = buildWidget' $ \s -> do
+    liftIO $ putStrLn s
+    return ((), debug)
 
 background :: Color -> Widget' t () ()
 background c =
@@ -32,7 +36,7 @@ background c =
     arr
         (const
              ( (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
-             , (: []) . Render . DrawShape c . Rect))
+             , (: []) . DrawShape c . Rect))
 
 label ::
        Color -> Widget' t (Font t, String) ()
@@ -40,9 +44,9 @@ label c = proc (f, s) -> do
     s' <- shift Nothing -< Just s
     let w = fromIntegral $ sum $ map ((\(_,_,_,_,x) -> x) . fontMetrics f . fromIntegral . fromEnum) s
         h = fromIntegral (ascent f - descent f) + 1.2 * count '\n' s
-    widgetOutput -< ( (stdParams { pHeight = h, pWidth = w }, Just s /= s') -- TODO
-             , \(Bounds x y _ _) ->
-                   [Render $ DrawShape c $ Text s (Coords x y) f])
+    widgetOutput -< ( (stdParams { pHeight = h, pWidth = w }, Just s /= s')
+                    , \ ~(Bounds x y _ _) ->
+                 [DrawShape c $ Text s (Coords x y) f])
     where
         count _ [] = 0
         count a (x:xs)
@@ -53,17 +57,18 @@ label' :: LayoutParam -> Int -> Widget' t String ()
 label' p size = proc s -> do
     r <- resource -< ResF size "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
     case r of
-      Just (RFont f) -> label (Color 0 0 0) -< (f, s)
-      _ -> returnA -< ()
+      RFont f -> label (Color 0 0 0) -< (f, s)
+      RError e -> debug -< e
+      _ -> debug -< "Resource is not a font"
 
-resource :: Widget' t ResourceId (Maybe (Resource t))
-resource = proc i -> do
-    widgetOutput' -< [LoadResource i]
-    g <- globals -< ()
-    returnA -< M.lookup i $ gResources g
+resource :: Widget' t ResourceId (Resource t)
+resource = buildWidget' $ \i -> do
+    g <- guiGlobals
+    res <- liftIO $ gResources g i
+    return (res, resource)
 
 image :: Widget' t (Sprite t) ()
-image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, True), \bs -> [Render $ Image t bs]) -- TODO
+image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegral w, pHeight = fromIntegral h}, True), \bs -> [Image t bs]) -- TODO
 
 -- textfield :: (Weight, Weight) -> Widget' t String String
 -- textfield (wx, wy) = stackLayout (0,0,0,0) (AlignCenter, AlignCenter) (wx, wy) $ proc content -> do
@@ -74,7 +79,7 @@ image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegr
 --         x1 = fromIntegral w * (1 - xe)
 --         y1 = fromIntegral h * (1 - ye)
 --     stackLayout (x0,y0,x1,y1) (AlignCenter, AlignCenter) (wx, wy) $ label' -< content
---     widgetOutput -< (stdParams {pWeightX = wx, pWeightY = wy}, \b@(Bounds x0' y0' x1' y1') -> [Render $ NinePatch np b $ Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
+--     widgetOutput -< (stdParams {pWeightX = wx, pWeightY = wy}, \b@(Bounds x0' y0' x1' y1') -> [NinePatch np b $ Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
 --     returnA -< content
 
 globals :: Widget' t () (Globals t)

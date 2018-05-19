@@ -7,14 +7,15 @@ module GUI
     , ButtonState(..)
     , MouseButton
     , Event(..)
-    , Cmd(..)
-    , GUI(..)
+    , GUI
     , guiGlobals
-    , guiCommand
+    , guiDraw
+    , runGUI
     ) where
 
 import Control.Monad.Fix
 import Control.Monad.IO.Class
+import Data.IORef
 import Drawable
 import Graphics.UI.GLFW (Key(..))
 import Resources
@@ -23,8 +24,8 @@ import Types
 data Globals t = Globals
     { gEvents :: [Event]
     , gTime :: Integer
-    , gResources :: Resources t
-    } deriving (Show)
+    , gResources :: ResourceId -> IO (Resource t)
+    }
 
 data KeyState
     = KeyUp
@@ -48,13 +49,8 @@ data Event
     | MouseMoveEvent Coords
     deriving (Show)
 
-data Cmd t
-    = LoadResource ResourceId
-    | Debug String
-    | Render (Drawable t)
-
 newtype GUI t a =
-    GUI (Globals t -> IO (a, [Cmd t]))
+    GUI (Globals t -> IO (a, [Drawable t]))
     deriving (Functor)
 
 instance Applicative (GUI t) where
@@ -66,10 +62,10 @@ instance Applicative (GUI t) where
             return (f' a', cf ++ ca)
 
 instance Monad (GUI t) where
-    (>>=) (GUI a) f =
+    (>>=) ~(GUI a) f =
         GUI $ \g -> do
             (a', ca) <- a g
-            let (GUI b) = f a'
+            let ~(GUI b) = f a'
             (b', cb) <- b g
             return (b', ca ++ cb)
 
@@ -77,7 +73,7 @@ instance MonadFix (GUI t) where
     mfix f =
         GUI $ \g -> mdo
             let (GUI a) = f a'
-            (a', ca) <- a g
+            ~(a', ca) <- a g
             return (a', ca)
 
 instance MonadIO (GUI t) where
@@ -86,5 +82,8 @@ instance MonadIO (GUI t) where
 guiGlobals :: GUI t (Globals t)
 guiGlobals = GUI $ \g -> return (g, [])
 
-guiCommand :: Cmd t -> GUI t ()
-guiCommand c = GUI $ \_ -> return ((), [c])
+guiDraw :: Drawable t -> GUI t ()
+guiDraw c = GUI $ \_ -> return ((), [c])
+
+runGUI :: GUI t a -> Globals t -> IO (a, [Drawable t])
+runGUI (GUI f) = f

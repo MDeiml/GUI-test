@@ -2,21 +2,15 @@
 {-# LANGUAGE Rank2Types #-}
 
 module Input
-    ( Key(..)
-    , KeyState(..)
-    , MouseButton
-    , ButtonState(..)
-    , Event(..)
-    , Globals(..)
-    , mouseListener
+    ( mouseListener
     , focusListener
     , widgetOutput
     , widgetOutput'
     , Widget'
-    , Cmd(..)
     ) where
 
 import Control.Applicative
+import Drawable
 import GUI
 import Graphics.UI.GLFW (Key(..))
 import Layout
@@ -25,16 +19,16 @@ import Widget
 
 type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
 
-widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Cmd t]) ()
+widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
 widgetOutput =
-    buildWidget $ \bs (p, r) -> do
-        mapM_ guiCommand $ r bs
+    buildWidget $ \bs ~(p, r) -> do
+        mapM_ guiDraw $ r bs
         return ((), p, widgetOutput)
 
-widgetOutput' :: Widget' t [Cmd t] ()
+widgetOutput' :: Widget' t [Drawable t] ()
 widgetOutput' =
     buildWidget' $ \r -> do
-        mapM_ guiCommand r
+        mapM_ guiDraw r
         return ((), widgetOutput')
 
 mouseListener :: Alternative o => Widget' t () (o (MouseButton, ButtonState))
