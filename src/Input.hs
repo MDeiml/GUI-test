@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Rank2Types #-}
+
 module Input
     ( Key(..)
     , KeyState(..)
@@ -16,33 +17,32 @@ module Input
     ) where
 
 import Control.Applicative
+import GUI
 import Graphics.UI.GLFW (Key(..))
 import Layout
 import Types
 import Widget
-import Drawable
-import Resources
-import GUI
 
 type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
 
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Cmd t]) ()
-widgetOutput = buildWidget $ \bs (p, r) -> do
-    mapM_ guiCommand $ r bs
-    return ((), p, widgetOutput)
+widgetOutput =
+    buildWidget $ \bs (p, r) -> do
+        mapM_ guiCommand $ r bs
+        return ((), p, widgetOutput)
 
 widgetOutput' :: Widget' t [Cmd t] ()
-widgetOutput' = buildWidget' $ \r -> do
-    mapM_ guiCommand r
-    return ((), widgetOutput')
-    
-mouseListener ::
-       Alternative o
-  => Widget' t () (o (MouseButton, ButtonState))
+widgetOutput' =
+    buildWidget' $ \r -> do
+        mapM_ guiCommand r
+        return ((), widgetOutput')
+
+mouseListener :: Alternative o => Widget' t () (o (MouseButton, ButtonState))
 mouseListener =
     buildWidget $ \bs _ -> do
         g <- guiGlobals
-        return ( foldl (<|>) empty (map (f bs) (gEvents g))
+        return
+            ( foldl (<|>) empty (map (f bs) (gEvents g))
             , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
             , mouseListener)
   where
@@ -61,7 +61,10 @@ focusListener = focusListener' False
         buildWidget $ \bs _ -> do
             g <- guiGlobals
             let focus' = foldl (f' bs) focus $ gEvents g
-            return (focus', (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False), focusListener' focus')
+            return
+                ( focus'
+                , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
+                , focusListener' focus')
       where
         f' bs focus' e =
             case e of

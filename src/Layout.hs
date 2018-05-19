@@ -20,7 +20,6 @@ module Layout
 
 import Data.List (transpose)
 import Data.Maybe (fromJust, isNothing, mapMaybe)
-import Drawable
 import Types
 import Widget
 import Control.Monad.Fix

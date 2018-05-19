@@ -17,7 +17,6 @@ import Data.Maybe
 import Drawable
 import Input
 import Layout
-import Renderer
 import Resources
 import Types
 import Widget

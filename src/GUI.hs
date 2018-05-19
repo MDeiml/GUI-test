@@ -1,13 +1,24 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecursiveDo #-}
-module GUI (Globals(..), KeyState(..), ButtonState(..), MouseButton, Event(..), Cmd(..), GUI(..), guiGlobals, guiCommand) where
+
+module GUI
+    ( Globals(..)
+    , KeyState(..)
+    , ButtonState(..)
+    , MouseButton
+    , Event(..)
+    , Cmd(..)
+    , GUI(..)
+    , guiGlobals
+    , guiCommand
+    ) where
 
 import Control.Monad.Fix
 import Control.Monad.IO.Class
-import Resources
 import Drawable
-import Types
 import Graphics.UI.GLFW (Key(..))
+import Resources
+import Types
 
 data Globals t = Globals
     { gEvents :: [Event]
@@ -42,27 +53,32 @@ data Cmd t
     | Debug String
     | Render (Drawable t)
 
-newtype GUI t a = GUI (Globals t -> IO (a, [Cmd t])) deriving (Functor)
+newtype GUI t a =
+    GUI (Globals t -> IO (a, [Cmd t]))
+    deriving (Functor)
 
 instance Applicative (GUI t) where
     pure x = GUI (const $ return (x, []))
-    (<*>) (GUI f) (GUI a) = GUI $ \g -> do
-        (f', cf) <- f g
-        (a', ca) <- a g
-        return (f' a', cf ++ ca)
+    (<*>) (GUI f) (GUI a) =
+        GUI $ \g -> do
+            (f', cf) <- f g
+            (a', ca) <- a g
+            return (f' a', cf ++ ca)
 
 instance Monad (GUI t) where
-    (>>=) (GUI a) f = GUI $ \g -> do
-        (a', ca) <- a g
-        let (GUI b) = f a'
-        (b', cb) <- b g
-        return (b', ca ++ cb)
+    (>>=) (GUI a) f =
+        GUI $ \g -> do
+            (a', ca) <- a g
+            let (GUI b) = f a'
+            (b', cb) <- b g
+            return (b', ca ++ cb)
 
 instance MonadFix (GUI t) where
-    mfix f = GUI $ \g -> mdo
-        let (GUI a) = f a'
-        (a', ca) <- a g
-        return (a', ca)
+    mfix f =
+        GUI $ \g -> mdo
+            let (GUI a) = f a'
+            (a', ca) <- a g
+            return (a', ca)
 
 instance MonadIO (GUI t) where
     liftIO a = GUI $ \_ -> fmap (\x -> (x, [])) a
