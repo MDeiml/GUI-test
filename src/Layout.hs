@@ -27,11 +27,9 @@ import Control.Monad.Fix
 
 type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
-type Layout' p1 p2 r a = forall g m i o. MonadFix m => Widget g r (p1, Bool) m i (a, o) -> Widget g r (p2, Bool) m i o
+type Layout' p1 p2 a = forall m i o. MonadFix m => Widget (p1, Bool) m i (a, o) -> Widget (p2, Bool) m i o
 
-type Layout p1 p2 d = forall g m i o. MonadFix m => Widget g d (p1, Bool) m i o -> Widget g d (p2, Bool) m i o
-
-type Weight = Maybe Float
+type Layout p1 p2 = forall m i o. MonadFix m => Widget (p1, Bool) m i o -> Widget (p2, Bool) m i o
 
 type Margin = (Float, Float, Float, Float)
 
@@ -44,38 +42,31 @@ data Align
     | AlignCenter
     | AlignRight
 
-data LayoutParam = LayoutParam
-    { pWidth :: Float
-    , pHeight :: Float
-    , pWeightX :: Weight
-    , pWeightY :: Weight
-    } deriving (Show, Eq)
-
 stdParams :: LayoutParam
 stdParams =
     LayoutParam
     {pWidth = 0, pHeight = 0, pWeightX = Nothing, pWeightY = Nothing}
 
-noLayout :: (Eq p) => Layout p p d
+noLayout :: (Eq p) => Layout p p
 noLayout =
     widgetLayout $ \ps ->
         (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
 widgetLayout' ::
-       (a -> Layout1 p1 p2) -> Layout' p1 p2 r a
+       (a -> Layout1 p1 p2) -> Layout' p1 p2 a
 widgetLayout' f a = buildWidget runWidget'
   where
-    runWidget' g bs i = do
-        rec ((oa, o), ps, rs, a') <- runWidget a g bs' i
+    runWidget' bs i = do
+        rec ((oa, o), ps, a') <- runWidget a bs' i
             let (calcBounds, p) = f oa $ map (\ ~(x,_) -> x) ps
                 bs' = calcBounds bs
-        return (o, (p, True), rs, widgetLayout' f a')
+        return (o, (p, True), widgetLayout' f a')
 
-widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2 d 
+widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2
 widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
-      runWidget' w0 mbs g bs i = do
-        rec ~(o, ps0, rs, w') <- runWidget w0 g bs' i
+      runWidget' w0 mbs bs i = do
+        rec ~(o, ps0, w') <- runWidget w0 bs' i
             let ps = map (\ ~(x,_) -> x) ps0
                 reval = any (\ ~(_,x) -> x) ps0
                 ~(~(calcBounds, p), reval') = 
@@ -92,7 +83,6 @@ widgetLayout f w = buildWidget $ runWidget' w Nothing
                 bs' = calcBounds bs
         return ( o
             , (p, reval')
-            , rs
             , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs')
              )
 
@@ -100,11 +90,11 @@ stackLayout ::
        Margin
     -> (Align, Align)
     -> (Weight, Weight)
-    -> Layout LayoutParam LayoutParam d 
+    -> Layout LayoutParam LayoutParam
 stackLayout m a l = widgetLayout $ stackLayout1 m a l
 
 stackLayout' ::
-       Layout' LayoutParam LayoutParam d ( Margin
+       Layout' LayoutParam LayoutParam ( Margin
                                                , (Align, Align)
                                                , (Weight, Weight))
 stackLayout' = widgetLayout' $ \(a, b, c) -> stackLayout1 a b c
@@ -148,11 +138,11 @@ stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
                 AlignRight -> (y1 - y0) - height
 
 linearLayout ::
-       Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam d
+       Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam
 linearLayout o l = widgetLayout $ linearLayout1 o l
 
 linearLayout' ::
-       Layout' LayoutParam LayoutParam d (Orientation, (Weight, Weight))
+       Layout' LayoutParam LayoutParam (Orientation, (Weight, Weight))
 linearLayout' = widgetLayout' $ uncurry linearLayout1
 
 linearLayout1 ::
@@ -206,10 +196,10 @@ linearLayout1 o (lx, ly) ps = (calcBounds, param)
 --     tpColspan :: Int,
 --     tpLayoutParam :: LayoutParam
 -- }
-tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam d 
+tableLayout :: Int -> (Weight, Weight) -> Layout LayoutParam LayoutParam
 tableLayout colwidth l = widgetLayout $ tableLayout1 colwidth l
 
-tableLayout' :: Layout' LayoutParam LayoutParam d (Int, (Weight, Weight))
+tableLayout' :: Layout' LayoutParam LayoutParam (Int, (Weight, Weight))
 tableLayout' = widgetLayout' $ uncurry tableLayout1
 
 tableLayout1 :: Int -> (Weight, Weight) -> Layout1 LayoutParam LayoutParam

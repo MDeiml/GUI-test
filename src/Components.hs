@@ -21,6 +21,7 @@ import Renderer
 import Resources
 import Types
 import Widget
+import GUI
 import qualified Data.Map as M
 
 debug :: Widget' t String ()
@@ -78,22 +79,24 @@ image = proc (Sprite t w h) -> widgetOutput -< ((stdParams { pWidth = fromIntegr
 --     returnA -< content
 
 globals :: Widget' t () (Globals t)
-globals = buildWidget' $ \g _ -> return (g, globals)
+globals = buildWidget' $ \_ -> do
+    g <- guiGlobals
+    return (g, globals)
 
 initial :: Widget' t a a
-initial = buildWidget' $ \_ i -> return (i, arr $ const i)
+initial = buildWidget' $ \i -> return (i, arr $ const i)
 
 evLast :: Widget' t (Maybe a) (Maybe a)
 evLast = evLast1 Nothing
   where
     evLast1 s =
-        buildWidget' $ \_ i ->
+        buildWidget' $ \i ->
             let new = i <|> s
              in return (new, evLast1 new)
 
 evLast' :: a -> Widget' t (Maybe a) a
 evLast' x =
-    buildWidget' $ \_ i ->
+    buildWidget' $ \i ->
         let new = fromMaybe x i
          in return (new, evLast' new)
 

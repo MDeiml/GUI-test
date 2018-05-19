@@ -7,7 +7,6 @@ module Drawable
 import Data.Word (Word8)
 import Resources
 import Types
-import Widget
 
 data Drawable t
     = DrawShape Color

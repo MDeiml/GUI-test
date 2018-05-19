@@ -52,6 +52,6 @@ test4 = stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $ p
 test :: IO ()
 test = do
     r <- create "Test" (800,600) :: IO GLFWRenderer
-    mainLoop r 15 test4
+    mainLoop r 15 test3
 
 main = test

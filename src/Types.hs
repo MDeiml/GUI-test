@@ -1,8 +1,19 @@
 module Types
     ( Bounds(..)
     , Coords(..)
+    , LayoutParam(..)
+    , Weight
     , inside
     ) where
+
+type Weight = Maybe Float
+
+data LayoutParam = LayoutParam
+    { pWidth :: Float
+    , pHeight :: Float
+    , pWeightX :: Weight
+    , pWeightY :: Weight
+    } deriving (Show, Eq)
 
 data Bounds =
     Bounds Float

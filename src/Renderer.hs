@@ -24,10 +24,10 @@ import Layout
 import Resources
 import Types
 import Widget
+import GUI
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BS
-import Data.Functor.Identity
 
 type App t = Widget' t () ()
 
@@ -60,16 +60,12 @@ mainLoop r fps w0 = do
                 (width, height) <- getSize r
                 events <- pollEvents r
                 clear r
-                let ~(_, ps, ds, w') =
-                        runIdentity $ runWidget
-                                w
-                                Globals
+                let (GUI gui) = runWidget w [Bounds 0 0 width height] ()
+                ~(~(_, ps, w'), ds) <- gui Globals
                                 { gEvents = events
                                 , gTime = round $ next * 1000
                                 , gResources = res
                                 }
-                                [Bounds 0 0 width height]
-                                ()
                 print $ any snd ps
                 res' <- loadResources r res $ mapMaybe (\case
                       LoadResource i -> Just i

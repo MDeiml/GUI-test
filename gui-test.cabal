@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib, Widget, Layout, Drawable, Types, Renderer, GLFWRenderer, Input, Font, Components, Resources, Texture
+  exposed-modules:     Lib, Widget, Layout, Drawable, Types, Renderer, GLFWRenderer, Input, Font, Components, Resources, Texture, GUI
   build-depends:       base >= 4.7 && < 5
                      , bytestring >= 0.10 && < 1
                      , containers >= 0.5 && < 1

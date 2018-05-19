@@ -9,6 +9,8 @@ module Input
     , Globals(..)
     , mouseListener
     , focusListener
+    , widgetOutput
+    , widgetOutput'
     , Widget'
     , Cmd(..)
     ) where
@@ -16,56 +18,33 @@ module Input
 import Control.Applicative
 import Graphics.UI.GLFW (Key(..))
 import Layout
-import Resources
 import Types
 import Widget
 import Drawable
-import Data.Functor.Identity
+import Resources
+import GUI
 
-data Globals t = Globals
-    { gEvents :: [Event]
-    , gTime :: Integer
-    , gResources :: Resources t
-    } deriving (Show)
+type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
 
-data KeyState
-    = KeyUp
-    | KeyDown
-    | KeyRepeat
-    deriving (Show)
+widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Cmd t]) ()
+widgetOutput = buildWidget $ \bs (p, r) -> do
+    mapM_ guiCommand $ r bs
+    return ((), p, widgetOutput)
 
-data ButtonState
-    = ButtonUp
-    | ButtonDown
-    deriving (Show)
-
-type MouseButton = Int
-
-data Event
-    = KeyEvent Key
-               KeyState
-    | MouseEvent MouseButton
-                 ButtonState
-                 Coords
-    | MouseMoveEvent Coords
-    deriving (Show)
-
-type Widget' t i o = Widget (Globals t) (Cmd t) (LayoutParam, Bool) Identity i o
-
-data Cmd t
-    = LoadResource ResourceId
-    | Debug String
-    | Render (Drawable t)
-
+widgetOutput' :: Widget' t [Cmd t] ()
+widgetOutput' = buildWidget' $ \r -> do
+    mapM_ guiCommand r
+    return ((), widgetOutput')
+    
 mouseListener ::
        Alternative o
   => Widget' t () (o (MouseButton, ButtonState))
 mouseListener =
-    buildWidget $ \g bs _ ->
+    buildWidget $ \bs _ -> do
+        g <- guiGlobals
         return ( foldl (<|>) empty (map (f bs) (gEvents g))
-        , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
-        , []
-        , mouseListener)
+            , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
+            , mouseListener)
   where
     f bs e =
         case e of
@@ -79,9 +58,10 @@ focusListener :: Widget' t () Bool
 focusListener = focusListener' False
   where
     focusListener' focus =
-        buildWidget $ \g bs _ ->
-            (let focus' = foldl (f' bs) focus $ gEvents g
-              in return (focus', (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False), [], focusListener' focus'))
+        buildWidget $ \bs _ -> do
+            g <- guiGlobals
+            let focus' = foldl (f' bs) focus $ gEvents g
+            return (focus', (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False), focusListener' focus')
       where
         f' bs focus' e =
             case e of
