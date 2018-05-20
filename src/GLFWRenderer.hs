@@ -101,6 +101,7 @@ instance Renderer GLFWRenderer Texture where
                  G.setKeyCallback win' $ Just $ kc es
                  G.setMouseButtonCallback win' $ Just $ mc es
                  G.setCursorPosCallback win' $ Just $ mmc es
+                 G.setCharCallback win' $ Just $ cc es
                  fontS <- createProgram ("default.vert", "fontShader.frag")
                  defS <- createProgram ("default.vert", "default.frag")
                  GL.blend $= GL.Enabled
@@ -138,6 +139,9 @@ instance Renderer GLFWRenderer Texture where
         mmc es win x y =
             let event = MouseMoveEvent (Coords (realToFrac x) (realToFrac y))
             in modifyIORef es (event :)
+        cc es win c =
+            let event = CharEvent c
+            in modifyIORef es (event :)
     render re (DrawShape (Color r g b) (Rect (Bounds x0 y0 x1 y1))) = do
         renderInit re (defaultShader re)
         GL.textureBinding GL.Texture2D $= Nothing
@@ -147,6 +151,13 @@ instance Renderer GLFWRenderer Texture where
             vertex x1 y0
             vertex x1 y1
             vertex x0 y1
+    render re (DrawShape (Color r g b) (Line (Coords x0 y0) (Coords x1 y1))) = do
+        renderInit re (defaultShader re)
+        GL.textureBinding GL.Texture2D $= Nothing
+        GL.renderPrimitive GL.Lines $ do
+            color r g b
+            vertex x0 y0
+            vertex x1 y1
     render re (Image (Texture (tex, u0, v0, u1, v1)) (Bounds x0 y0 x1 y1)) = do
         renderInit re $ defaultShader re
         GL.textureBinding GL.Texture2D $= Just tex
@@ -243,44 +254,49 @@ instance Renderer GLFWRenderer Texture where
             vertex x1 y1
             texCoord ue v1
             vertex xe y1
-    render re (DrawShape (Color r g b) (Text text (Coords x y) f)) = do
-        renderInit re (fontShader re)
-        let Texture (tex, _, _, _, _) =
-                glyphs f $ fromIntegral $ fromEnum $ head text
-        GL.textureBinding GL.Texture2D $= Just tex
-        GL.renderPrimitive GL.Quads $ do
-            color r g b
-            foldM_
-                (\(x', y') c ->
-                     if c == '\n'
-                         then return
-                                  ( x
-                                  , y' +
-                                    fromIntegral
-                                        (ascent f - descent f +
-                                         round (fromIntegral (fontsize f) * 0.2)))
-                         else do
-                             let c' = fromIntegral $ fromEnum c
-                                 Texture (_, x0, y0, x1, y1) = glyphs f c'
-                                 fi = fromIntegral
-                                 (w, h, bx, by, a) =
-                                     let (a1, a2, a3, a4, a5) = fontMetrics f c'
-                                     in (fi a1, fi a2, fi a3, fi a4, fi a5)
-                                 y'' =
-                                     fromIntegral $
-                                     round $ y' + fromIntegral (ascent f) - by
-                                 x'' = fromIntegral $ round $ x' + bx
-                             texCoord x0 y0
-                             vertex x'' y''
-                             texCoord x1 y0
-                             vertex (x'' + w) y''
-                             texCoord x1 y1
-                             vertex (x'' + w) (y'' + h)
-                             texCoord x0 y1
-                             vertex x'' (y'' + h)
-                             return (x' + a, y'))
-                (x, y)
-                text
+    render re (DrawShape (Color r g b) (Text text (Coords x y) f)) =
+        unless (null text) $ do
+            renderInit re (fontShader re)
+            let Texture (tex, _, _, _, _) =
+                    glyphs f $ fromIntegral $ fromEnum $ head text
+            GL.textureBinding GL.Texture2D $= Just tex
+            GL.renderPrimitive GL.Quads $ do
+                color r g b
+                foldM_
+                    (\(x', y') c ->
+                         if c == '\n'
+                             then return
+                                      ( x
+                                      , y' +
+                                        fromIntegral
+                                            (ascent f - descent f +
+                                             round
+                                                 (fromIntegral (fontsize f) *
+                                                  0.2)))
+                             else do
+                                 let c' = fromIntegral $ fromEnum c
+                                     Texture (_, x0, y0, x1, y1) = glyphs f c'
+                                     fi = fromIntegral
+                                     (w, h, bx, by, a) =
+                                         let (a1, a2, a3, a4, a5) =
+                                                 fontMetrics f c'
+                                         in (fi a1, fi a2, fi a3, fi a4, fi a5)
+                                     y'' =
+                                         fromIntegral $
+                                         round $
+                                         y' + fromIntegral (ascent f) - by
+                                     x'' = fromIntegral $ round $ x' + bx
+                                 texCoord x0 y0
+                                 vertex x'' y''
+                                 texCoord x1 y0
+                                 vertex (x'' + w) y''
+                                 texCoord x1 y1
+                                 vertex (x'' + w) (y'' + h)
+                                 texCoord x0 y1
+                                 vertex x'' (y'' + h)
+                                 return (x' + a, y'))
+                    (x, y)
+                    text
     clear r = do
         G.makeContextCurrent $ Just $ window r
         GL.clear [GL.ColorBuffer]

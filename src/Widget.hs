@@ -5,6 +5,7 @@ module Widget
     , buildWidget'
     , buildWidget
     , shift
+    , widgetState
     ) where
 
 import Control.Monad.Fix
@@ -41,6 +42,11 @@ buildWidget' f =
 
 shift :: MonadFix m => a -> Widget p m a a
 shift x = widget $ \_ last -> return (x, [], shift last)
+
+widgetState :: MonadFix m => s -> Widget p m (s, a) (s, b) -> Widget p m a b
+widgetState s w = widget $ \bs i -> do
+    ~(~(s', o), p, w') <- runWidget w bs (s, i)
+    return (o, p, widgetState s' w')
 
 instance MonadFix m => Category (Widget p m) where
     id = widget $ \_ i -> return (i, [], id)

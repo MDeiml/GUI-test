@@ -14,7 +14,7 @@ data Resource t
     | RSpr (Sprite t)
     | RNin (NinePatch t)
     | RError String
-    deriving (Show)
+    deriving (Show, Eq)
 
 data Sprite t =
     Sprite t

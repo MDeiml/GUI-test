@@ -43,6 +43,7 @@ type MouseButton = Int
 data Event
     = KeyEvent Key
                KeyState
+    | CharEvent Char
     | MouseEvent MouseButton
                  ButtonState
                  Coords

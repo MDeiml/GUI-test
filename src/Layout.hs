@@ -15,6 +15,7 @@ module Layout
     , tableLayout'
     , noLayout
     , stackLayout
+    , stackLayout'
     , stdParams
     ) where
 
@@ -26,7 +27,7 @@ import Control.Monad.Fix
 
 type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
-type Layout' p1 p2 a = forall m i o. MonadFix m => Widget (p1, Bool) m i (a, o) -> Widget (p2, Bool) m i o
+type Layout' p1 p2 a = forall m i o. MonadFix m => Widget (p1, Bool) m i o -> Widget (p2, Bool) m (i, a) o
 
 type Layout p1 p2 = forall m i o. MonadFix m => Widget (p1, Bool) m i o -> Widget (p2, Bool) m i o
 
@@ -37,9 +38,9 @@ data Orientation
     | Vertical
 
 data Align
-    = AlignLeft
+    = AlignStart
     | AlignCenter
-    | AlignRight
+    | AlignEnd
 
 stdParams :: LayoutParam
 stdParams =
@@ -55,9 +56,9 @@ widgetLayout' ::
        (a -> Layout1 p1 p2) -> Layout' p1 p2 a
 widgetLayout' f a = buildWidget runWidget'
   where
-    runWidget' bs i = do
-        rec ((oa, o), ps, a') <- runWidget a bs' i
-            let (calcBounds, p) = f oa $ map (\ ~(x,_) -> x) ps
+      runWidget' bs (i, ia)  = do
+        rec (o, ps, a') <- runWidget a bs' i
+            let (calcBounds, p) = f ia $ map (\ ~(x,_) -> x) ps
                 bs' = calcBounds bs
         return (o, (p, True), widgetLayout' f a')
 
@@ -127,14 +128,14 @@ stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
                 Just _ -> y1 - y0
         xs =
             case ax of
-                AlignLeft -> 0
+                AlignStart -> 0
                 AlignCenter -> ((x1 - x0) - width) / 2
-                AlignRight -> (x1 - x0) - width
+                AlignEnd -> (x1 - x0) - width
         ys =
             case ay of
-                AlignLeft -> 0
+                AlignStart -> 0
                 AlignCenter -> ((y1 - y0) - height) / 2
-                AlignRight -> (y1 - y0) - height
+                AlignEnd -> (y1 - y0) - height
 
 linearLayout ::
        Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam

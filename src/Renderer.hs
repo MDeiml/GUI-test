@@ -66,7 +66,6 @@ mainLoop r fps w0 = do
                         , gTime = round $ next * 1000
                         , gResources = loadResource' r res
                         }
-                print $ any snd ps
                 mapM_ (render r) $ reverse ds
                 swapBuffers r
                 c <- closing r

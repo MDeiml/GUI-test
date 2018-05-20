@@ -6,10 +6,14 @@ module Input
     , focusListener
     , widgetOutput
     , widgetOutput'
+    , globals
+    , time
     , Widget'
     ) where
 
 import Control.Applicative
+import Control.Arrow
+import Data.Maybe (mapMaybe)
 import Drawable
 import GUI
 import Graphics.UI.GLFW (Key(..))
@@ -18,6 +22,15 @@ import Types
 import Widget
 
 type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
+
+globals :: Widget' t () (Globals t)
+globals =
+    buildWidget' $ \_ -> do
+        g <- guiGlobals
+        return (g, globals)
+
+time :: Widget' t () Integer
+time = arr gTime <<< globals
 
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
 widgetOutput =
