@@ -75,6 +75,6 @@ test5 =
 test :: IO ()
 test = do
     r <- create "Test" (800, 600) :: IO GLFWRenderer
-    mainLoop r 15 test5
+    mainLoop r 2 test5
 
 main = test

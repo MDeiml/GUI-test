@@ -47,32 +47,27 @@ loadResource' r ress i = do
 
 mainLoop :: (Renderer r t) => r -> Int -> App t -> IO ()
 mainLoop r fps w0 = do
-    next <- getPOSIXTime
     res <- newIORef M.empty
-    mainLoop' w0 res next
+    mainLoop' w0 res
   where
-    mainLoop' w res next = do
+    frameTime = 1 / fromIntegral fps
+    mainLoop' w res = do
+        events <- waitEvents r frameTime
+        (width, height) <- getSize r
+        clear r
+        let gui = runGUI $ runWidget w [Bounds 0 0 width height] ()
         now <- getPOSIXTime
-        if now >= next
-            then do
-                (width, height) <- getSize r
-                events <- pollEvents r
-                clear r
-                let gui = runGUI $ runWidget w [Bounds 0 0 width height] ()
-                ~(~(_, ps, w'), ds) <-
-                    gui
-                        Globals
-                        { gEvents = events
-                        , gTime = round $ next * 1000
-                        , gResources = loadResource' r res
-                        }
-                mapM_ (render r) $ reverse ds
-                swapBuffers r
-                c <- closing r
-                unless c $ mainLoop' w' res (next + 1 / fromIntegral fps)
-            else do
-                threadDelay 1000
-                mainLoop' w res next
+        ~(~(_, ps, w'), ds) <-
+            gui
+                Globals
+                { gEvents = events
+                , gTime = round $ now * 1000
+                , gResources = loadResource' r res
+                }
+        mapM_ (render r) $ reverse ds
+        swapBuffers r
+        c <- closing r
+        unless c $ mainLoop' w' res
 
 loadNinpatch :: Renderer r t => r -> FilePath -> MaybeT IO (NinePatch t)
 loadNinpatch r fp = do
@@ -99,5 +94,5 @@ class Renderer r t | r -> t where
     swapBuffers :: r -> IO ()
     getSize :: r -> IO (Float, Float)
     closing :: r -> IO Bool
-    pollEvents :: r -> IO [Event]
+    waitEvents :: r -> Double -> IO [Event]
     loadResource :: r -> ResourceId -> IO (Resource t)

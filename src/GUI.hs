@@ -58,16 +58,16 @@ instance Applicative (GUI t) where
     pure x = GUI (const $ return (x, []))
     (<*>) (GUI f) (GUI a) =
         GUI $ \g -> do
-            (f', cf) <- f g
-            (a', ca) <- a g
+            ~(f', cf) <- f g
+            ~(a', ca) <- a g
             return (f' a', cf ++ ca)
 
 instance Monad (GUI t) where
     (>>=) ~(GUI a) f =
         GUI $ \g -> do
-            (a', ca) <- a g
-            let ~(GUI b) = f a'
-            (b', cb) <- b g
+            ~(a', ca) <- a g
+            let (GUI b) = f a'
+            ~(b', cb) <- b g
             return (b', ca ++ cb)
 
 instance MonadFix (GUI t) where
@@ -83,8 +83,8 @@ instance MonadIO (GUI t) where
 guiGlobals :: GUI t (Globals t)
 guiGlobals = GUI $ \g -> return (g, [])
 
-guiDraw :: Drawable t -> GUI t ()
-guiDraw c = GUI $ \_ -> return ((), [c])
+guiDraw :: [Drawable t] -> GUI t ()
+guiDraw c = GUI $ \_ -> return ((), c)
 
 runGUI :: GUI t a -> Globals t -> IO (a, [Drawable t])
 runGUI (GUI f) = f

@@ -35,13 +35,13 @@ time = arr gTime <<< globals
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
 widgetOutput =
     buildWidget $ \bs ~(p, r) -> do
-        mapM_ guiDraw $ r bs
+        guiDraw $ r bs
         return ((), p, widgetOutput)
 
 widgetOutput' :: Widget' t [Drawable t] ()
 widgetOutput' =
     buildWidget' $ \r -> do
-        mapM_ guiDraw r
+        guiDraw r
         return ((), widgetOutput')
 
 mouseListener :: Alternative o => Widget' t () (o (MouseButton, ButtonState))
@@ -67,13 +67,13 @@ focusListener = focusListener' False
     focusListener' focus =
         buildWidget $ \bs _ -> do
             g <- guiGlobals
-            let focus' = foldl (f' bs) focus $ gEvents g
+            let focus' = foldr (f' bs) focus $ gEvents g
             return
                 ( focus'
                 , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
                 , focusListener' focus')
       where
-        f' bs focus' e =
+        f' bs e focus' =
             case e of
                 MouseEvent _but ButtonDown coords -> coords `inside` bs
-                _ -> focus
+                _ -> focus'

@@ -1,6 +1,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecursiveDo #-}
+
 module Layout
     ( LayoutParam(..)
     , Orientation(..)
@@ -17,19 +18,24 @@ module Layout
     , stackLayout
     , stackLayout'
     , stdParams
+    , constLayout
     ) where
 
+import Control.Monad.Fix
 import Data.List (transpose)
 import Data.Maybe (fromJust, isNothing, mapMaybe)
 import Types
 import Widget
-import Control.Monad.Fix
 
 type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
-type Layout' p1 p2 a = forall m i o. MonadFix m => Widget (p1, Bool) m i o -> Widget (p2, Bool) m (i, a) o
+type Layout' p1 p2 a
+     = forall m i o. MonadFix m =>
+                         Widget (p1, Bool) m i o -> Widget (p2, Bool) m (i, a) o
 
-type Layout p1 p2 = forall m i o. MonadFix m => Widget (p1, Bool) m i o -> Widget (p2, Bool) m i o
+type Layout p1 p2
+     = forall m i o. MonadFix m =>
+                         Widget (p1, Bool) m i o -> Widget (p2, Bool) m i o
 
 type Margin = (Float, Float, Float, Float)
 
@@ -47,44 +53,47 @@ stdParams =
     LayoutParam
     {pWidth = 0, pHeight = 0, pWeightX = Nothing, pWeightY = Nothing}
 
+constLayout :: (Eq p1) => p2 -> Layout p1 p2
+constLayout p = widgetLayout $ const (repeat, p)
+
 noLayout :: (Eq p) => Layout p p
 noLayout =
     widgetLayout $ \ps ->
         (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
-widgetLayout' ::
-       (a -> Layout1 p1 p2) -> Layout' p1 p2 a
+widgetLayout' :: (a -> Layout1 p1 p2) -> Layout' p1 p2 a
 widgetLayout' f a = buildWidget runWidget'
   where
-      runWidget' bs (i, ia)  = do
-        rec (o, ps, a') <- runWidget a bs' i
-            let (calcBounds, p) = f ia $ map (\ ~(x,_) -> x) ps
+    runWidget' bs ~(i, ia) = do
+        rec ~(o, ps, a') <- runWidget a bs' i
+            let (calcBounds, p) = f ia $ map (\ ~(x, _) -> x) ps
                 bs' = calcBounds bs
         return (o, (p, True), widgetLayout' f a')
 
 widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2
 widgetLayout f w = buildWidget $ runWidget' w Nothing
   where
-      runWidget' w0 mbs bs i = do
+    runWidget' w0 mbs bs i = do
         rec ~(o, ps0, w') <- runWidget w0 bs' i
-            let ps = map (\ ~(x,_) -> x) ps0
-                reval = any (\ ~(_,x) -> x) ps0
-                ~(~(calcBounds, p), reval') = 
+            let ps = map (\ ~(x, _) -> x) ps0
+                reval = any (\ ~(_, x) -> x) ps0
+                ~(~(calcBounds, p), reval') =
                     case mbs of
                         Nothing -> (f ps, True)
                         Just ~(ps', p', cb, b, bs) ->
                             if not reval
-                                then (( \x ->
-                                           if x == b
-                                               then bs
-                                               else cb x
-                                      , p'), False)
+                                then ( ( \x ->
+                                             if x == b
+                                                 then bs
+                                                 else cb x
+                                       , p')
+                                     , False)
                                 else (f ps, True)
                 bs' = calcBounds bs
-        return ( o
+        return
+            ( o
             , (p, reval')
-            , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs')
-             )
+            , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs'))
 
 stackLayout ::
        Margin
@@ -95,8 +104,8 @@ stackLayout m a l = widgetLayout $ stackLayout1 m a l
 
 stackLayout' ::
        Layout' LayoutParam LayoutParam ( Margin
-                                               , (Align, Align)
-                                               , (Weight, Weight))
+                                       , (Align, Align)
+                                       , (Weight, Weight))
 stackLayout' = widgetLayout' $ \(a, b, c) -> stackLayout1 a b c
 
 stackLayout1 ::
@@ -141,8 +150,7 @@ linearLayout ::
        Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam
 linearLayout o l = widgetLayout $ linearLayout1 o l
 
-linearLayout' ::
-       Layout' LayoutParam LayoutParam (Orientation, (Weight, Weight))
+linearLayout' :: Layout' LayoutParam LayoutParam (Orientation, (Weight, Weight))
 linearLayout' = widgetLayout' $ uncurry linearLayout1
 
 linearLayout1 ::

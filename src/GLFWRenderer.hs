@@ -305,9 +305,9 @@ instance Renderer GLFWRenderer Texture where
         (w, h) <- G.getFramebufferSize $ window r
         return (fromIntegral w, fromIntegral h)
     closing r = G.windowShouldClose $ window r
-    pollEvents r = do
+    waitEvents r timeout = do
         G.makeContextCurrent $ Just $ window r
-        G.pollEvents
+        G.waitEventsTimeout timeout
         es <- readIORef $ events r
         writeIORef (events r) []
         return es

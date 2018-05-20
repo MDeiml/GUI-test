@@ -102,7 +102,10 @@ textfield p =
          y1 = fromIntegral h * (1 - ye)
      widgetOutput -< ((p, False), const [])
      g <- globals -< ()
-     let (content'', caret'') = keyChars g (content', caret')
+     focus <- focusListener -< ()
+     let (content'', caret'')
+           = if focus then keyChars g (content', caret') else
+               (content', caret')
      RFont f <- resource -<
                   ResF 20 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
      let cx
@@ -114,19 +117,19 @@ textfield p =
                          fontMetrics f . fromIntegral . fromEnum)
                       (take caret'' content''))
      t <- time -< ()
-     let blink = ((t `quot` 1000) `mod` 2) == 0
-     stackLayout' (label (Color 0 0 0)) -<
+     let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
+     constLayout stdParams $ stackLayout' (label (Color 0 0 0)) -<
        ((f, content''),
         ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing)))
      widgetOutput -<
-       ((p, False),
+       ((stdParams, False),
         \ ~(Bounds x0' y0' x1' y1') ->
           [DrawShape (Color 0 0 0)
              (Line (Coords (x0' + cx) (y0' + y0))
                 (Coords (x0' + cx) (y1' - y1)))
            | blink])
      widgetOutput -<
-       ((p, False),
+       ((stdParams, False),
         \ b@ ~(Bounds x0' y0' x1' y1') ->
           [NinePatch np b $
              Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
