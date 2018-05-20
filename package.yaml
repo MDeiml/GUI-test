@@ -1,0 +1,59 @@
+name:                gui-test
+version:             0.1.0.0
+github:              "githubuser/gui-test"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/gui-test#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- bytestring >= 0.10 && < 1
+- containers >= 0.5 && < 1
+- freetype2 >= 0.1 && < 2
+- GLFW-b >= 3.2 && < 4
+- memory >= 0.14 && < 1
+- OpenGL >= 3.0 && < 4
+- time >= 1.6 && < 2
+- JuicyPixels >= 3.2 && < 4
+- vector >= 0.12 && < 1
+- aeson >= 1.1 && < 2
+- transformers >= 0.5 && < 1
+
+library:
+  source-dirs: src
+
+executables:
+  gui-test-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - gui-test
+
+tests:
+  gui-test-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - gui-test
