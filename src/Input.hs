@@ -7,21 +7,38 @@ module Input
     , widgetOutput
     , widgetOutput'
     , globals
+    , resource
     , time
+    , debug
     , Widget'
     ) where
 
 import Control.Applicative
 import Control.Arrow
+import Control.Monad.IO.Class
 import Data.Maybe (mapMaybe)
 import Drawable
 import GUI
 import Graphics.UI.GLFW (Key(..))
 import Layout
+import Resources
 import Types
 import Widget
 
 type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
+
+debug :: Widget' t String ()
+debug =
+    buildWidget' $ \s -> do
+        liftIO $ putStrLn s
+        return ((), debug)
+
+resource :: Widget' t ResourceId (Resource t)
+resource =
+    buildWidget' $ \i -> do
+        g <- guiGlobals
+        res <- liftIO $ gResources g i
+        return (res, resource)
 
 globals :: Widget' t () (Globals t)
 globals =

@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 420d474272b2361ee8443e0a7e4cd3ea1ae5c36942326f7d274bcf987c7ce2d5
+-- hash: 210e3f6b9b700bf6c832b4e325422b2c495f4776edfa693f0a9af3da33a712fe
 
 name:           gui-test
 version:        0.1.0.0
@@ -37,6 +37,7 @@ library
       Renderer
       Resources
       SDLRenderer
+      Textfield
       Texture
       Types
       Widget

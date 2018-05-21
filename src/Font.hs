@@ -81,7 +81,7 @@ getCharBitmaps = getCharBitmaps' Nothing
                         last
                 i' <- peek i
                 return (c, i')
-        if index == 0 || char >= 128
+        if index == 0 || char >= 256
             then return []
             else do
                 g <- getCharBitmap ff index px

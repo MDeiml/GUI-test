@@ -16,6 +16,7 @@ import Data.Vector.Storable (unsafeWith)
 import Data.Word
 import Drawable
 import Font
+import Foreign.C.Types
 import GUI
 import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
@@ -23,6 +24,7 @@ import Renderer
 import Resources
 import qualified SDL as S
 import SDL.Internal.Numbered (toNumber)
+import qualified SDL.Raw.Types as SR
 import Texture
 import Types
 
@@ -102,6 +104,7 @@ instance Renderer SDLRenderer Texture where
         defS <- createProgram ("default.vert", "default.frag")
         GL.blend $= GL.Enabled
         GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+        S.startTextInput (SR.Rect 0 0 100 100)
         return
             SDLRenderer
             { window = win
@@ -114,13 +117,13 @@ instance Renderer SDLRenderer Texture where
         e <- S.waitEventTimeout $ round $ timeout * 1000
         es <- S.pollEvents
         let es' = maybeToList e
-        catMaybes <$> mapM f es'
+        concat <$> mapM f (es' ++ es)
       where
         f ev =
             case S.eventPayload ev of
                 S.WindowClosedEvent _ -> do
                     writeIORef (closed r) True
-                    return Nothing
+                    return []
                 S.KeyboardEvent d ->
                     let ks =
                             case S.keyboardEventKeyMotion d of
@@ -146,12 +149,16 @@ instance Renderer SDLRenderer Texture where
                             }
                         kc =
                             fromIntegral $ S.unwrapKeycode $ S.keysymKeycode sym
-                    in return $ Just $ KeyEvent mod' kc ks
+                    in return [KeyEvent mod' kc ks]
+                S.TextEditingEvent d -> return []
+                S.TextInputEvent d ->
+                    return $ map CharEvent $ T.unpack $ S.textInputEventText d
                 S.MouseMotionEvent d ->
                     let (S.P (S.V2 x y)) = S.mouseMotionEventPos d
-                    in return $
-                       Just $
-                       MouseMoveEvent (Coords (fromIntegral x) (fromIntegral y))
+                    in return
+                           [ MouseMoveEvent
+                                 (Coords (fromIntegral x) (fromIntegral y))
+                           ]
                 S.MouseButtonEvent d ->
                     let (S.P (S.V2 x y)) = S.mouseButtonEventPos d
                         b = fromIntegral $ toNumber $ S.mouseButtonEventButton d
@@ -159,13 +166,13 @@ instance Renderer SDLRenderer Texture where
                             case S.mouseButtonEventMotion d of
                                 S.Pressed -> ButtonDown
                                 S.Released -> ButtonUp
-                    in return $
-                       Just $
-                       MouseEvent
-                           b
-                           bs
-                           (Coords (fromIntegral x) (fromIntegral y))
-                _ -> return Nothing
+                    in return
+                           [ MouseEvent
+                                 b
+                                 bs
+                                 (Coords (fromIntegral x) (fromIntegral y))
+                           ]
+                _ -> return []
     clear r = GL.clear [GL.ColorBuffer]
     swapBuffers r = S.glSwapWindow $ window r
     getSize r = do
