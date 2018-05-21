@@ -16,6 +16,7 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad.IO.Class
 import Data.IORef
+import Data.List (findIndex)
 import qualified Data.Map as M
 import Data.Maybe
 import Drawable
@@ -100,43 +101,45 @@ textfield p =
          y0 = fromIntegral h * ys
          x1 = fromIntegral w * (1 - xe)
          y1 = fromIntegral h * (1 - ye)
-     widgetOutput -< ((p, False), const [])
+     bs <- bounds -< (p, False)
+     let ~(Bounds x0' y0' x1' y1') = bs
      g <- globals -< ()
      focus <- focusListener -< ()
-     let (content'', caret'')
-           = if focus then keyChars g (content', caret') else
-               (content', caret')
      RFont f <- resource -<
                   ResF 20 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
-     let cx
-           = x0 +
-               fromIntegral
-                 (sum $
-                    map
-                      ((\ (_, _, _, _, x) -> x) .
-                         fontMetrics f . fromIntegral . fromEnum)
-                      (take caret'' content''))
+     let ws
+           = map
+               ((\ (_, _, _, _, x) -> x) .
+                  fontMetrics f . fromIntegral . fromEnum)
+               content'
+     let (content'', caret'')
+           = if focus then keyChars g ws (x0' + x0) bs (content', caret') else
+               (content', caret')
+     let ws'
+           = map
+               ((\ (_, _, _, _, x) -> x) .
+                  fontMetrics f . fromIntegral . fromEnum)
+               content''
+     let cx = x0 + fromIntegral (sum $ take caret'' ws')
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
      constLayout stdParams $ stackLayout' (label (Color 0 0 0)) -<
        ((f, content''),
         ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing)))
-     widgetOutput -<
-       ((stdParams, False),
-        \ ~(Bounds x0' y0' x1' y1') ->
-          [DrawShape (Color 0 0 0)
-             (Line (Coords (x0' + cx) (y0' + y0))
-                (Coords (x0' + cx) (y1' - y1)))
-           | blink])
-     widgetOutput -<
-       ((stdParams, False),
-        \ b@ ~(Bounds x0' y0' x1' y1') ->
-          [NinePatch np b $
-             Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
+     widgetOutput' -<
+       [DrawShape (Color 0 0 0)
+          (Line (Coords (x0' + cx) (y0' + y0))
+             (Coords (x0' + cx) (y1' - y1)))
+        | blink]
+     widgetOutput' -<
+       [NinePatch np bs $
+          Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)]
      returnA -< ((content'', caret''), content'')
   where
-    keyChars g (c, i) = foldr f (c, i) evs
+    keyChars g ws x0 bs (c, i) = foldr f (c, i) evs
       where
+        ws' = scanl (+) 0 ws
+        ws'' = zipWith (\a b -> (a + b) `quot` 2) ws' (tail ws')
         evs = gEvents g
         f (KeyEvent k KeyDown) x = f (KeyEvent k KeyRepeat) x
         f (KeyEvent Key'Left KeyRepeat) (s, j) = (s, max 0 (j - 1))
@@ -146,6 +149,12 @@ textfield p =
                 then (s, 0)
                 else (take (j - 1) s ++ drop j s, j - 1)
         f (CharEvent c) (s, j) = (take j s ++ [c] ++ drop j s, j + 1)
+        f (MouseEvent 0 ButtonDown c@(Coords mx _my)) (s, j) =
+            if c `inside` bs
+                then ( s
+                     , fromMaybe (length s) $
+                       findIndex (floor (mx - x0) <=) ws'')
+                else (s, j)
         f _ (s, j) = (s, j)
 
 initial :: Widget' t a a

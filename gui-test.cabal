@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c5a2a30e5101f0572d3f969433f92f71febfa752b5e932c3c3583fd2ee40046b
+-- hash: 46b775b54e0c82ab0cac81b54bb918cef3466d46a3bedea3b0fbf2c299c00ab5
 
 name:           gui-test
 version:        0.1.0.0
@@ -64,7 +64,7 @@ executable gui-test-exe
       Paths_gui_test
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O3
   build-depends:
       GLFW-b >=3.2 && <4
     , JuicyPixels >=3.2 && <4

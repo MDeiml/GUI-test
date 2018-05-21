@@ -1,4 +1,5 @@
 {-# LANGUAGE RecursiveDo #-}
+
 module Widget
     ( Widget
     , runWidget
@@ -6,13 +7,14 @@ module Widget
     , buildWidget
     , shift
     , widgetState
+    , bounds
     ) where
 
-import Control.Monad.Fix
 import Control.Arrow
 import Control.Category
-import Prelude hiding ((.), id)
+import Control.Monad.Fix
 import GUI
+import Prelude hiding ((.), id)
 import Types
 
 newtype Widget p m i o = Widget
@@ -22,7 +24,8 @@ newtype Widget p m i o = Widget
 runWidget = runWidget1
 
 widget ::
-       MonadFix m => ([Bounds] -> i -> m (o, [p], Widget p m i o))
+       MonadFix m
+    => ([Bounds] -> i -> m (o, [p], Widget p m i o))
     -> Widget p m i o
 widget = Widget
 
@@ -44,9 +47,13 @@ shift :: MonadFix m => a -> Widget p m a a
 shift x = widget $ \_ last -> return (x, [], shift last)
 
 widgetState :: MonadFix m => s -> Widget p m (s, a) (s, b) -> Widget p m a b
-widgetState s w = widget $ \bs i -> do
-    ~(~(s', o), p, w') <- runWidget w bs (s, i)
-    return (o, p, widgetState s' w')
+widgetState s w =
+    widget $ \bs i -> do
+        ~(~(s', o), p, w') <- runWidget w bs (s, i)
+        return (o, p, widgetState s' w')
+
+bounds :: MonadFix m => Widget p m p Bounds
+bounds = widget $ \bs p -> return (head bs, [p], bounds)
 
 instance MonadFix m => Category (Widget p m) where
     id = widget $ \_ i -> return (i, [], id)
