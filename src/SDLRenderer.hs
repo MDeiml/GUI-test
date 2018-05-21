@@ -1,19 +1,17 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module GLFWRenderer
-    ( module Renderer
-    , GLFWRenderer
+module SDLRenderer
+    ( SDLRenderer
     ) where
 
 import qualified Codec.Picture as P
-import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.IORef
-import qualified Data.Map as M
-import Data.Maybe
+import Data.Maybe (catMaybes, maybeToList)
+import qualified Data.Text as T
 import Data.Vector.Storable (unsafeWith)
 import Data.Word
 import Drawable
@@ -21,16 +19,17 @@ import Font
 import GUI
 import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
-import qualified Graphics.UI.GLFW as G
-import Input
 import Renderer
 import Resources
+import qualified SDL as S
+import SDL.Internal.Numbered (toNumber)
 import Texture
 import Types
 
-data GLFWRenderer = GLFWRenderer
-    { window :: G.Window
-    , events :: IORef [Event]
+data SDLRenderer = SDLRenderer
+    { window :: S.Window
+    , context :: S.GLContext
+    , closed :: IORef Bool
     , defaultShader :: GL.Program
     , fontShader :: GL.Program
     }
@@ -78,78 +77,101 @@ createProgram (fileV, fileF) = do
         then return prog
         else GL.get (GL.programInfoLog prog) >>= error
 
-renderInit :: GLFWRenderer -> GL.Program -> IO ()
+renderInit :: SDLRenderer -> GL.Program -> IO ()
 renderInit re shader = do
-    G.makeContextCurrent $ Just $ window re
-    (w, h) <- G.getFramebufferSize $ window re
+    S.glMakeCurrent (window re) (context re)
+    (S.V2 w h) <- S.glGetDrawableSize $ window re
     GL.loadIdentity
     GL.ortho 0 (fromIntegral w) (fromIntegral h) 0 1 (-1)
     GL.currentProgram $= Just shader
 
-instance Renderer GLFWRenderer Texture where
+instance Renderer SDLRenderer Texture where
     create title (w, h) = do
-        print 2
-        _ <- G.init
-        win <- G.createWindow w h title Nothing Nothing
-        maybe
-            (error "Window could not be crated")
-            (\win' -> do
-                 G.makeContextCurrent $ Just win'
-                 GL.texture GL.Texture2D $= GL.Enabled
-                 es <- newIORef []
-                 fs <- newIORef []
-                 G.setKeyCallback win' $ Just $ kc es
-                 G.setMouseButtonCallback win' $ Just $ mc es
-                 G.setCursorPosCallback win' $ Just $ mmc es
-                 G.setCharCallback win' $ Just $ cc es
-                 fontS <- createProgram ("default.vert", "fontShader.frag")
-                 defS <- createProgram ("default.vert", "default.frag")
-                 GL.blend $= GL.Enabled
-                 GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
-                 return
-                     GLFWRenderer
-                     { window = win'
-                     , events = es
-                     , defaultShader = defS
-                     , fontShader = fontS
-                     })
-            win
+        S.initializeAll
+        win <-
+            S.createWindow
+                (T.pack title)
+                S.defaultWindow
+                { S.windowInitialSize = S.V2 (fromIntegral w) (fromIntegral h)
+                , S.windowOpenGL = Just S.defaultOpenGL
+                }
+        S.showWindow win
+        con <- S.glCreateContext win
+        c <- newIORef False
+        fontS <- createProgram ("default.vert", "fontShader.frag")
+        defS <- createProgram ("default.vert", "default.frag")
+        GL.blend $= GL.Enabled
+        GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+        return
+            SDLRenderer
+            { window = win
+            , context = con
+            , closed = c
+            , defaultShader = defS
+            , fontShader = fontS
+            }
+    waitEvents r timeout = do
+        e <- S.waitEventTimeout $ round $ timeout * 1000
+        es <- S.pollEvents
+        let es' = maybeToList e
+        catMaybes <$> mapM f es'
       where
-        kc es _win key _code ks mod = do
-            let ks' =
-                    case ks of
-                        G.KeyState'Pressed -> KeyDown
-                        G.KeyState'Released -> KeyUp
-                        G.KeyState'Repeating -> KeyRepeat
-                event =
-                    KeyEvent
-                        Modifiers
-                        { mShift = G.modifierKeysShift mod
-                        , mCtrl = G.modifierKeysControl mod
-                        , mAlt = G.modifierKeysAlt mod
-                        }
-                        (fromEnum key)
-                        ks'
-            modifyIORef es (event :)
-        mc es win button bs _mod = do
-            (x, y) <- G.getCursorPos win
-            let bs' =
-                    case bs of
-                        G.MouseButtonState'Pressed -> ButtonDown
-                        G.MouseButtonState'Released -> ButtonUp
-                button' = fromEnum button
-                event =
-                    MouseEvent
-                        button'
-                        bs'
-                        (Coords (realToFrac x) (realToFrac y))
-            modifyIORef es (event :)
-        mmc es win x y =
-            let event = MouseMoveEvent (Coords (realToFrac x) (realToFrac y))
-            in modifyIORef es (event :)
-        cc es win c =
-            let event = CharEvent c
-            in modifyIORef es (event :)
+        f ev =
+            case S.eventPayload ev of
+                S.WindowClosedEvent _ -> do
+                    writeIORef (closed r) True
+                    return Nothing
+                S.KeyboardEvent d ->
+                    let ks =
+                            case S.keyboardEventKeyMotion d of
+                                S.Pressed ->
+                                    if S.keyboardEventRepeat d
+                                        then KeyRepeat
+                                        else KeyDown
+                                S.Released -> KeyUp
+                        sym = S.keyboardEventKeysym d
+                        mod = S.keysymModifier sym
+                        mod' =
+                            Modifiers
+                            { mShift =
+                                  S.keyModifierLeftShift mod ||
+                                  S.keyModifierRightShift mod ||
+                                  S.keyModifierCapsLock mod
+                            , mCtrl =
+                                  S.keyModifierLeftCtrl mod ||
+                                  S.keyModifierRightCtrl mod
+                            , mAlt =
+                                  S.keyModifierLeftAlt mod ||
+                                  S.keyModifierRightAlt mod
+                            }
+                        kc =
+                            fromIntegral $ S.unwrapKeycode $ S.keysymKeycode sym
+                    in return $ Just $ KeyEvent mod' kc ks
+                S.MouseMotionEvent d ->
+                    let (S.P (S.V2 x y)) = S.mouseMotionEventPos d
+                    in return $
+                       Just $
+                       MouseMoveEvent (Coords (fromIntegral x) (fromIntegral y))
+                S.MouseButtonEvent d ->
+                    let (S.P (S.V2 x y)) = S.mouseButtonEventPos d
+                        b = fromIntegral $ toNumber $ S.mouseButtonEventButton d
+                        bs =
+                            case S.mouseButtonEventMotion d of
+                                S.Pressed -> ButtonDown
+                                S.Released -> ButtonUp
+                    in return $
+                       Just $
+                       MouseEvent
+                           b
+                           bs
+                           (Coords (fromIntegral x) (fromIntegral y))
+                _ -> return Nothing
+    clear r = GL.clear [GL.ColorBuffer]
+    swapBuffers r = S.glSwapWindow $ window r
+    getSize r = do
+        (S.V2 w h) <- S.glGetDrawableSize $ window r
+        return (fromIntegral w, fromIntegral h)
+    closing r = readIORef $ closed r
     render re (DrawShape (Color r g b) (Rect (Bounds x0 y0 x1 y1))) = do
         renderInit re (defaultShader re)
         GL.textureBinding GL.Texture2D $= Nothing
@@ -305,22 +327,8 @@ instance Renderer GLFWRenderer Texture where
                                  return (x' + a, y'))
                     (x, y)
                     text
-    clear r = do
-        G.makeContextCurrent $ Just $ window r
-        GL.clear [GL.ColorBuffer]
-    swapBuffers r = G.swapBuffers $ window r
-    getSize r = do
-        (w, h) <- G.getFramebufferSize $ window r
-        return (fromIntegral w, fromIntegral h)
-    closing r = G.windowShouldClose $ window r
-    waitEvents r timeout = do
-        G.makeContextCurrent $ Just $ window r
-        G.waitEventsTimeout timeout
-        es <- readIORef $ events r
-        writeIORef (events r) []
-        return es
     loadResource re (ResF size fontname) = do
-        G.makeContextCurrent $ Just $ window re
+        S.glMakeCurrent (window re) (context re)
         RFont <$> generateAtlas fontname size
     loadResource re (ResN fp) =
         maybe (RError "") RNin <$> runMaybeT (loadNinpatch re fp)

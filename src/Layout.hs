@@ -19,6 +19,7 @@ module Layout
     , stackLayout'
     , stdParams
     , constLayout
+    , constLayout'
     ) where
 
 import Control.Monad.Fix
@@ -53,8 +54,17 @@ stdParams =
     LayoutParam
     {pWidth = 0, pHeight = 0, pWeightX = Nothing, pWeightY = Nothing}
 
-constLayout :: (Eq p1) => p2 -> Layout p1 p2
-constLayout p = widgetLayout $ const (repeat, p)
+constLayout :: (Eq p1) => Bounds -> Layout p1 p2
+constLayout bs w =
+    buildWidget' $ \i -> do
+        ~(o, _, w') <- runWidget w (repeat bs) i
+        return (o, constLayout bs w')
+
+constLayout' :: (Eq p1) => Layout' p1 p2 Bounds
+constLayout' w =
+    buildWidget' $ \(i, bs) -> do
+        ~(o, _, w') <- runWidget w (repeat bs) i
+        return (o, constLayout' w')
 
 noLayout :: (Eq p) => Layout p p
 noLayout =

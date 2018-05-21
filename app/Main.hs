@@ -3,8 +3,8 @@
 module Main where
 
 import Control.Arrow
-import GLFWRenderer
 import Lib
+import SDLRenderer
 
 test1 :: App t
 test1 =
@@ -74,7 +74,7 @@ test5 =
 
 test :: IO ()
 test = do
-    r <- create "Test" (800, 600) :: IO GLFWRenderer
+    r <- create "Test" (800, 600) :: IO SDLRenderer
     mainLoop r 2 test5
 
 main = test

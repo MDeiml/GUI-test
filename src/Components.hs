@@ -123,9 +123,10 @@ textfield p =
      let cx = x0 + fromIntegral (sum $ take caret'' ws')
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
-     constLayout stdParams $ stackLayout' (label (Color 0 0 0)) -<
-       ((f, content''),
-        ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing)))
+     constLayout' $ stackLayout' (label (Color 0 0 0)) -<
+       (((f, content''),
+         ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing))),
+        bs)
      widgetOutput' -<
        [DrawShape (Color 0 0 0)
           (Line (Coords (x0' + cx) (y0' + y0))
@@ -141,13 +142,13 @@ textfield p =
         ws' = scanl (+) 0 ws
         ws'' = zipWith (\a b -> (a + b) `quot` 2) ws' (tail ws')
         evs = gEvents g
-        f (KeyEvent k KeyDown) x = f (KeyEvent k KeyRepeat) x
-        f (KeyEvent Key'Left KeyRepeat) (s, j) = (s, max 0 (j - 1))
-        f (KeyEvent Key'Right KeyRepeat) (s, j) = (s, min (length s) (j + 1))
-        f (KeyEvent Key'Backspace KeyRepeat) (s, j) =
-            if j == 0
-                then (s, 0)
-                else (take (j - 1) s ++ drop j s, j - 1)
+        f (KeyEvent m k KeyDown) x = f (KeyEvent m k KeyRepeat) x
+        -- f (KeyEvent _ Key'Left KeyRepeat) (s, j) = (s, max 0 (j - 1))
+        -- f (KeyEvent _ Key'Right KeyRepeat) (s, j) = (s, min (length s) (j + 1))
+        -- f (KeyEvent _ Key'Backspace KeyRepeat) (s, j) =
+        --     if j == 0
+        --         then (s, 0)
+        --         else (take (j - 1) s ++ drop j s, j - 1)
         f (CharEvent c) (s, j) = (take j s ++ [c] ++ drop j s, j + 1)
         f (MouseEvent 0 ButtonDown c@(Coords mx _my)) (s, j) =
             if c `inside` bs

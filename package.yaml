@@ -32,6 +32,8 @@ dependencies:
 - vector >= 0.12 && < 1
 - aeson >= 1.1 && < 2
 - transformers >= 0.5 && < 1
+- sdl2 >= 2.4 && < 3
+- text >= 1.1 && < 2
 
 library:
   source-dirs: src

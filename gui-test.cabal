@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 46b775b54e0c82ab0cac81b54bb918cef3466d46a3bedea3b0fbf2c299c00ab5
+-- hash: 420d474272b2361ee8443e0a7e4cd3ea1ae5c36942326f7d274bcf987c7ce2d5
 
 name:           gui-test
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       Lib
       Renderer
       Resources
+      SDLRenderer
       Texture
       Types
       Widget
@@ -53,6 +54,8 @@ library
     , containers >=0.5 && <1
     , freetype2 >=0.1 && <2
     , memory >=0.14 && <1
+    , sdl2 >=2.4 && <3
+    , text >=1.1 && <2
     , time >=1.6 && <2
     , transformers >=0.5 && <1
     , vector >=0.12 && <1
@@ -76,6 +79,8 @@ executable gui-test-exe
     , freetype2 >=0.1 && <2
     , gui-test
     , memory >=0.14 && <1
+    , sdl2 >=2.4 && <3
+    , text >=1.1 && <2
     , time >=1.6 && <2
     , transformers >=0.5 && <1
     , vector >=0.12 && <1
@@ -100,6 +105,8 @@ test-suite gui-test-test
     , freetype2 >=0.1 && <2
     , gui-test
     , memory >=0.14 && <1
+    , sdl2 >=2.4 && <3
+    , text >=1.1 && <2
     , time >=1.6 && <2
     , transformers >=0.5 && <1
     , vector >=0.12 && <1

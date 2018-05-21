@@ -7,6 +7,8 @@ module GUI
     , ButtonState(..)
     , MouseButton
     , Event(..)
+    , Key
+    , Modifiers(..)
     , GUI
     , guiGlobals
     , guiDraw
@@ -17,7 +19,6 @@ import Control.Monad.Fix
 import Control.Monad.IO.Class
 import Data.IORef
 import Drawable
-import Graphics.UI.GLFW (Key(..))
 import Resources
 import Types
 
@@ -40,8 +41,17 @@ data ButtonState
 
 type MouseButton = Int
 
+type Key = Int
+
+data Modifiers = Modifiers
+    { mShift :: Bool
+    , mCtrl :: Bool
+    , mAlt :: Bool
+    } deriving (Show, Eq)
+
 data Event
-    = KeyEvent Key
+    = KeyEvent Modifiers
+               Key
                KeyState
     | CharEvent Char
     | MouseEvent MouseButton
