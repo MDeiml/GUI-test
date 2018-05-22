@@ -54,21 +54,22 @@ mainLoop r fps w0 = do
         events <- waitEvents r frameTime
         (width, height) <- getSize r
         clear r
-        let gui = runGUI $ runWidget w [Bounds 0 0 width height] ()
         now <- getPOSIXTime
-        ~(~(_, _, w'), ds) <-
-            gui
+        let glob =
                 Globals
                 { gEvents = events
                 , gTime = round $ now * 1000
                 , gResources = loadResource' r res
                 }
+            gui = runGUI $ runWidget w ()
+        ~(~(_, _, ds'), ds) <- gui glob
+        ~(w', ds'') <- runGUI (ds' [Bounds 0 0 width height]) glob
         mapM_
             (\case
                  Render d -> render r d
                  RunIO m -> m
                  _ -> return ()) $
-            reverse ds
+            reverse ds ++ reverse ds''
         when
             (any
                  (\case

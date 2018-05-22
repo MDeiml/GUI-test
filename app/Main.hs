@@ -62,14 +62,35 @@ test4 =
      background (Color 255 255 255) -< ()
 
 test5 :: App t
-test5 =
-    stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $
-    proc _ ->
-  do _ <- textfield stdParams{pHeight = 30, pWidth = 100} <<<
-            once "test"
-            -< ()
-     background (Color 0 255 255) -< ()
-     returnA -< ()
+test5 = stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $
+    proc _ -> do
+        a -< ()
+        background (Color 255 255 0) -< ()
+  where
+    inp =
+        linearLayout Horizontal (Nothing, Nothing) $
+        proc _ -> do
+     i1 <- textfield stdParams{pHeight = 30, pWidth = 100} <<<
+             once "2"
+             -< ()
+     label' 20 -< "+"
+     i2 <- textfield stdParams{pHeight = 30, pWidth = 100} <<<
+             once "3"
+             -< ()
+     let i1'
+           = case reads i1 of
+               [(x,_)] -> Just x
+               _ -> Nothing
+     let i2'
+           = case reads i2 of
+               [(x,_)] -> Just x
+               _ -> Nothing
+     returnA -< (+) <$> i1' <*> (i2' :: Maybe Integer)
+    a =
+        linearLayout Vertical (Just 0, Just 0) $
+        proc _ -> do
+     n <- evLast' 5 <<< inp -< ()
+     label' 20 -< show n
 
 test :: IO ()
 test = do

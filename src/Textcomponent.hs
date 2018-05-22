@@ -56,7 +56,7 @@ textInputIO = widgetState False w
 
 label :: Color -> Widget' t (Font t, String) ()
 label c =
-    proc (f, s) ->
+    proc ~(f, s) ->
   do s' <- shift Nothing -< Just s
      let w = fromIntegral $
                sum $
@@ -88,8 +88,8 @@ textfield :: LayoutParam -> Widget' t (Maybe String) String
 textfield p =
     stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (pWeightX p, pWeightY p) $
     widgetState ("", 0, 0) $
-    proc ((content, caret, caret0), ev) ->
-  do let (content', caret', caret0')
+    proc ~(~(content, caret, caret0), ev) ->
+  do let ~(content', caret', caret0')
            = maybe (content, caret, caret0) (\ s -> (s, length s, length s))
                ev
      RNin np <- resource -< ResN "textfield.json"
@@ -98,9 +98,8 @@ textfield p =
          y0 = fromIntegral h * ys
          x1 = fromIntegral w * (1 - xe)
          y1 = fromIntegral h * (1 - ye)
-     bs <- bounds -< (p, False)
-     let ~(Bounds x0' y0' x1' y1') = bs
-     es <- events -< ()
+     widgetOutput -< ((p, False), const [])
+     es <- mouseListener -< ()
      focus <- focusListener -< ()
      textInputIO -< focus
      RFont f <- resource -<
@@ -110,9 +109,8 @@ textfield p =
                ((\ (_, _, _, _, x) -> x) .
                   fontMetrics f . fromIntegral . fromEnum)
                content'
-     let (content'', caret'', caret0'')
-           = if focus then
-               keyChars es ws (x0' + x0) bs (content', caret', caret0') else
+     let ~(content'', caret'', caret0'')
+           = if focus then keyChars es ws x0 (content', caret', caret0') else
                (content', caret', caret0')
      let ws'
            = map
@@ -123,27 +121,30 @@ textfield p =
      let cx' = x0 + fromIntegral (sum $ take caret0'' ws')
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
-     constLayout' $ stackLayout' (label (Color 0 0 0)) -<
-       (((f, content''),
-         ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing))),
-        bs)
-     widgetOutput' -<
-       [DrawShape (Color 0 0 0)
-          (Line (Coords (x0' + cx) (y0' + y0))
-             (Coords (x0' + cx) (y1' - y1)))
-        | caret'' == caret0'', blink]
-         ++
-         [DrawShape (Color 200 200 200)
-            (Rect
-               (Bounds (x0' + min cx cx') (y0' + y0) (x0' + max cx cx')
-                  (y1' - y1)))
-          | caret'' /= caret0'']
-     widgetOutput' -<
-       [NinePatch np bs $
-          Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)]
+     stackLayout' (label (Color 0 0 0)) -<
+       ((f, content''),
+        ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing)))
+     widgetOutput -<
+       ((stdParams, False),
+        \ (Bounds x0' y0' _x1' y1') ->
+          [DrawShape (Color 0 0 0)
+             (Line (Coords (x0' + cx) (y0' + y0))
+                (Coords (x0' + cx) (y1' - y1)))
+           | caret'' == caret0'', blink]
+            ++
+            [DrawShape (Color 200 200 200)
+               (Rect
+                  (Bounds (x0' + min cx cx') (y0' + y0) (x0' + max cx cx')
+                     (y1' - y1)))
+             | caret'' /= caret0''])
+     widgetOutput -<
+       ((stdParams, False),
+        \ bs@(Bounds x0' y0' x1' y1') ->
+          [NinePatch np bs $
+             Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
      returnA -< ((content'', caret'', caret0''), content'')
   where
-    keyChars evs ws x0 bs s = foldr f s evs
+    keyChars evs ws x0 s = foldr f s evs
       where
         ws' = scanl (+) 0 ws
         ws'' = zipWith (\a b -> (a + b) `quot` 2) ws' (tail ws')
@@ -152,11 +153,7 @@ textfield p =
             ( take (min i j) s ++ [c] ++ drop (max i j) s
             , min i j + 1
             , min i j + 1)
-        f (MouseEvent 1 ButtonDown c@(Coords mx _my)) (s, i, j) =
-            if c `inside` bs
-                then let i' =
-                             fromMaybe (length s) $
-                             findIndex (floor (mx - x0) <=) ws''
-                     in (s, i', i')
-                else (s, i - 1, j)
+        f (MouseEvent 1 ButtonDown (Coords mx _my)) (s, _, _) =
+            let i' = fromMaybe (length s) $ findIndex (floor (mx - x0) <=) ws''
+            in (s, i', i')
         f _ x = x

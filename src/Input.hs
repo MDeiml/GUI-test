@@ -49,9 +49,13 @@ time =
 
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
 widgetOutput =
-    buildWidget $ \bs ~(p, r) -> do
-        guiDraw $ r bs
-        return ((), p, widgetOutput)
+    buildWidget $ \(p, r) ->
+        return
+            ( ()
+            , p
+            , \bs -> do
+                  guiDraw $ r bs
+                  return widgetOutput)
 
 widgetOutput' :: Widget' t [Drawable t] ()
 widgetOutput' =
@@ -59,36 +63,34 @@ widgetOutput' =
         guiDraw r
         return ((), widgetOutput')
 
-mouseListener :: Widget' t () [(MouseButton, ButtonState)]
-mouseListener =
-    buildWidget $ \bs _ -> do
+mouseListener :: Widget' t () [Event]
+mouseListener = buildWidget $ runWidget' (Bounds 0 0 0 0)
+  where
+    runWidget' bs' _ = do
         es <- guiEvents
         return
-            ( mapMaybe (f bs) es
-            , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
-            , mouseListener)
-  where
-    f bs e =
+            ( mapMaybe (f bs') es
+            , (stdParams, False)
+            , return . buildWidget . runWidget')
+    f bs@(Bounds x0 y0 _ _) e =
         case e of
-            MouseEvent but butS coords ->
-                if coords `inside` bs
-                    then Just (but, butS)
+            MouseEvent but butS c@(Coords x y) ->
+                if c `inside` bs -- HELP!!!
+                    then Just (MouseEvent but butS (Coords (x - x0) (y - y0)))
                     else Nothing
-            _ -> Nothing
+            e -> Just e
 
 focusListener :: Widget' t () Bool
-focusListener = focusListener' False
+focusListener = buildWidget $ runWidget' False (Bounds 0 0 0 0)
   where
-    focusListener' focus =
-        buildWidget $ \bs _ -> do
-            es <- guiEvents
-            let focus' = foldr (f' bs) focus es
-            return
-                ( focus'
-                , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
-                , focusListener' focus')
-      where
-        f' bs e focus' =
-            case e of
-                MouseEvent _but ButtonDown coords -> coords `inside` bs
-                _ -> focus'
+    runWidget' focus bs' _ = do
+        es <- guiEvents
+        let focus' = foldr (f' bs') focus es
+        return
+            ( focus'
+            , (stdParams, False)
+            , return . buildWidget . runWidget' focus')
+    f' bs e focus' =
+        case e of
+            MouseEvent _but ButtonDown coords -> coords `inside` bs
+            _ -> focus'

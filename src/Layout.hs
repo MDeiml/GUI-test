@@ -1,6 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE RecursiveDo #-}
 
 module Layout
     ( LayoutParam(..)
@@ -57,13 +56,15 @@ stdParams =
 constLayout :: (Eq p1) => Bounds -> Layout p1 p2
 constLayout bs w =
     buildWidget' $ \i -> do
-        ~(o, _, w') <- runWidget w (repeat bs) i
+        ~(o, _, d) <- runWidget w i
+        w' <- d (repeat bs)
         return (o, constLayout bs w')
 
 constLayout' :: (Eq p1) => Layout' p1 p2 Bounds
 constLayout' w =
     buildWidget' $ \(i, bs) -> do
-        ~(o, _, w') <- runWidget w (repeat bs) i
+        ~(o, _, d) <- runWidget w i
+        w' <- d (repeat bs)
         return (o, constLayout' w')
 
 noLayout :: (Eq p) => Layout p p
@@ -74,36 +75,39 @@ noLayout =
 widgetLayout' :: (a -> Layout1 p1 p2) -> Layout' p1 p2 a
 widgetLayout' f a = buildWidget runWidget'
   where
-    runWidget' bs ~(i, ia) = do
-        rec ~(o, ps, a') <- runWidget a bs' i
-            let (calcBounds, p) = f ia $ map (\ ~(x, _) -> x) ps
-                bs' = calcBounds bs
-        return (o, (p, True), widgetLayout' f a')
+    runWidget' ~(i, ia) = do
+        ~(o, ps, d) <- runWidget a i
+        let (calcBounds, p) = f ia $ map (\ ~(x, _) -> x) ps
+        return (o, (p, True), fmap (widgetLayout' f) . d . calcBounds)
 
 widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2
-widgetLayout f w = buildWidget $ runWidget' w Nothing
+widgetLayout f w = buildWidget $ runWidget' Nothing w
   where
-    runWidget' w0 mbs bs i = do
-        rec ~(o, ps0, w') <- runWidget w0 bs' i
-            let ps = map (\ ~(x, _) -> x) ps0
-                reval = any (\ ~(_, x) -> x) ps0
-                ~(~(calcBounds, p), reval') =
-                    case mbs of
-                        Nothing -> (f ps, True)
-                        Just ~(p', cb, b, bs) ->
-                            if not reval
-                                then ( ( \x ->
-                                             if x == b
-                                                 then bs
-                                                 else cb x
-                                       , p')
-                                     , False)
-                                else (f ps, True)
-                bs' = calcBounds bs
+    runWidget' mbs w0 i = do
+        ~(o, ps0, d) <- runWidget w0 i
+        let ps = map (\ ~(x, _) -> x) ps0
+            reval = any (\ ~(_, x) -> x) ps0
+            ~(~(calcBounds, p), reval') =
+                case mbs of
+                    Nothing -> (f ps, True)
+                    Just ~(p', cb, b, bs) ->
+                        if not reval
+                            then ( ( \x ->
+                                         if x == b
+                                             then bs
+                                             else cb x
+                                   , p')
+                                 , False)
+                            else (f ps, True)
         return
             ( o
             , (p, reval')
-            , buildWidget $ runWidget' w' $ Just (p, calcBounds, bs, bs'))
+            , \bs -> do
+                  let bs' = calcBounds bs
+                  w' <- d bs'
+                  return $
+                      buildWidget $
+                      runWidget' (Just (p, calcBounds, bs, bs')) w')
 
 stackLayout ::
        Margin
@@ -140,10 +144,12 @@ stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
         width =
             case pWeightX p of
                 Nothing -> pWidth (head ps)
+                Just 0 -> pWidth p
                 Just _ -> x1 - x0
         height =
             case pWeightY p of
                 Nothing -> pHeight (head ps)
+                Just 0 -> pHeight p
                 Just _ -> y1 - y0
         xs =
             case ax of
@@ -180,8 +186,8 @@ linearLayout1 o (lx, ly) ps = (calcBounds, param)
             Horizontal -> totalX
     pHeight' =
         case o of
-            Vertical -> maximum $ map pHeight ps
-            Horizontal -> totalY
+            Horizontal -> maximum $ map pHeight ps
+            Vertical -> totalY
     calcBounds (Bounds x0 y0 x1 y1) =
         case o of
             Horizontal -> stackH x0 $ map calcBoundsH ps
@@ -196,12 +202,12 @@ linearLayout1 o (lx, ly) ps = (calcBounds, param)
                 0
                 y0
                 (pWidth p + weightX (pWeightX p))
-                (maybe (pHeight p) (const $ y1 - y0) $ pWeightY p)
+                (y0 + maybe (pHeight p) (const $ y1 - y0) (pWeightY p))
         calcBoundsV p =
             Bounds
                 x0
                 0
-                (maybe (pWidth p) (const $ x1 - x0) $ pWeightX p)
+                (x0 + maybe (pWidth p) (const $ x1 - x0) (pWeightX p))
                 (pHeight p + weightY (pWeightY p))
         stackH _ [] = []
         stackH x (Bounds a0 b0 a1 b1:bs) =

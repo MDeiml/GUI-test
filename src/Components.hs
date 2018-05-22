@@ -26,7 +26,7 @@ background c =
     widgetOutput <<<
     arr
         (const
-             ( (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
+             ( (stdParams {pWeightX = Just 1, pWeightY = Just 1}, False)
              , (: []) . DrawShape c . Rect))
 
 image :: Widget' t (Sprite t) ()
