@@ -6,7 +6,6 @@ module Components
     , evLast
     , evLast'
     , debug
-    , once
     , image
     , module Textcomponent
     ) where
@@ -40,9 +39,6 @@ image =
 
 initial :: Widget' t a a
 initial = buildWidget' $ \i -> return (i, arr $ const i)
-
-once :: a -> Widget' t () (Maybe a)
-once x = buildWidget' $ const $ return (Just x, arr $ const Nothing)
 
 evLast :: Widget' t (Maybe a) (Maybe a)
 evLast = evLast1 Nothing

@@ -10,9 +10,11 @@ module Input
     , time
     , events
     , debug
+    , once
     , Widget'
     ) where
 
+import Control.Arrow
 import Data.Maybe (mapMaybe)
 import Drawable
 import GUI
@@ -22,6 +24,9 @@ import Types
 import Widget
 
 type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
+
+once :: a -> Widget' t () (Maybe a)
+once x = buildWidget' $ const $ return (Just x, arr $ const Nothing)
 
 debug :: Widget' t String ()
 debug =
@@ -70,7 +75,7 @@ mouseListener = buildWidget $ runWidget' (Bounds 0 0 0 0)
         es <- guiEvents
         return
             ( mapMaybe (f bs') es
-            , (stdParams, False)
+            , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
             , return . buildWidget . runWidget')
     f bs@(Bounds x0 y0 _ _) e =
         case e of
@@ -88,7 +93,7 @@ focusListener = buildWidget $ runWidget' False (Bounds 0 0 0 0)
         let focus' = foldr (f' bs') focus es
         return
             ( focus'
-            , (stdParams, False)
+            , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
             , return . buildWidget . runWidget' focus')
     f' bs e focus' =
         case e of

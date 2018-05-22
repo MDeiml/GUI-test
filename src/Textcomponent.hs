@@ -2,11 +2,19 @@
 
 module Textcomponent
     ( textfield
+    , textfield'
     , label
     , label'
+    , stdFont
+    , LabelConfig(..)
+    , stdLabelConfig
+    , TextfieldConfig(..)
+    , stdTextfieldConfig
     ) where
 
+import Control.Applicative
 import Control.Arrow
+import Control.Monad
 import Data.List (findIndex)
 import Data.Maybe
 import Drawable
@@ -50,14 +58,35 @@ textInputIO = widgetState False w
   where
     w =
         buildWidget' $ \(f', f) -> do
-            guiStartTextInput (f && not f')
-            guiStopTextInput (f' && not f)
+            when (f && not f') guiStartTextInput
+            when (f' && not f) guiStopTextInput
             return ((f, ()), w)
 
-label :: Color -> Widget' t (Font t, String) ()
-label c =
-    proc ~(f, s) ->
-  do s' <- shift Nothing -< Just s
+data LabelConfig = LabelConfig
+    { labelConfigFont :: ResourceId
+    , labelConfigColor :: Color
+    , labelConfigText :: String
+    }
+
+stdLabelConfig :: LabelConfig
+stdLabelConfig =
+    LabelConfig
+    { labelConfigFont = stdFont
+    , labelConfigColor = Color 0 0 0
+    , labelConfigText = ""
+    }
+
+stdFont :: ResourceId
+stdFont = ResF 20 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
+
+label :: Widget' t LabelConfig ()
+label =
+    proc config ->
+  do let s = labelConfigText config
+         fId = labelConfigFont config
+         c = labelConfigColor config
+     RFont f <- resource -< fId
+     s' <- shift Nothing -< Just s
      let w = fromIntegral $
                sum $
                  map
@@ -74,25 +103,55 @@ label c =
         | a == x = 1 + count a xs
         | otherwise = count a xs
 
-label' :: Int -> Widget' t String ()
-label' size =
-    proc s ->
-  do r <- resource -<
-            ResF size "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
-     case r of
-         RFont f -> label (Color 0 0 0) -< (f, s)
-         RError e -> debug -< e
-         _ -> debug -< "Resource is not a font"
+label' :: Widget' t String ()
+label' = proc s -> label -< stdLabelConfig{labelConfigText = s}
 
-textfield :: LayoutParam -> Widget' t (Maybe String) String
-textfield p =
-    stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (pWeightX p, pWeightY p) $
-    widgetState ("", 0, 0) $
-    proc ~(~(content, caret, caret0), ev) ->
-  do let ~(content', caret', caret0')
-           = maybe (content, caret, caret0) (\ s -> (s, length s, length s))
-               ev
-     RNin np <- resource -< ResN "textfield.json"
+data TextfieldConfig = TextfieldConfig
+    { textfieldConfigText :: String
+    , textfieldConfigTextUpdate :: Maybe String
+    , textfieldConfigLayoutParam :: LayoutParam
+    , textfieldConfigFont :: ResourceId
+    , textfieldConfigNinepatch :: ResourceId
+    , textfieldConfigTextColor :: Color
+    , textfieldConfigSelectColor :: Color
+    }
+
+stdTextfieldConfig :: TextfieldConfig
+stdTextfieldConfig =
+    TextfieldConfig
+    { textfieldConfigText = ""
+    , textfieldConfigTextUpdate = Nothing
+    , textfieldConfigLayoutParam = stdParams {pWidth = 80, pHeight = 30}
+    , textfieldConfigFont = stdFont
+    , textfieldConfigNinepatch = ResN "textfield.json"
+    , textfieldConfigTextColor = Color 0 0 0
+    , textfieldConfigSelectColor = Color 200 200 200
+    }
+
+textfield :: Widget' t TextfieldConfig String
+textfield =
+    proc config ->
+  do let p = textfieldConfigLayoutParam config
+     stackLayout' w -<
+       (config,
+        ((0, 0, 0, 0), (AlignStart, AlignCenter),
+         (pWeightX p, pWeightY p)))
+  where
+    w =
+        widgetState ("", 0, 0) $
+        proc ~(last, config) -> do
+     let initText = textfieldConfigText config
+         ev = textfieldConfigTextUpdate config
+         p = textfieldConfigLayoutParam config
+         fId = textfieldConfigFont config
+         nId = textfieldConfigNinepatch config
+         c = textfieldConfigTextColor config
+         cs = textfieldConfigSelectColor config
+     initEv <- once () -< ()
+     let ~(content', caret', caret0')
+           = maybe last (\ s -> (s, length s, length s))
+               (ev <|> fmap (const initText) initEv)
+     RNin np <- resource -< nId
      let NP (Sprite _ w h) (xs, ys, xe, ye) = np
          x0 = fromIntegral w * xs
          y0 = fromIntegral h * ys
@@ -102,8 +161,7 @@ textfield p =
      es <- mouseListener -< ()
      focus <- focusListener -< ()
      textInputIO -< focus
-     RFont f <- resource -<
-                  ResF 20 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
+     RFont f <- resource -< fId
      let ws
            = map
                ((\ (_, _, _, _, x) -> x) .
@@ -121,29 +179,26 @@ textfield p =
      let cx' = x0 + fromIntegral (sum $ take caret0'' ws')
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
-     stackLayout' (label (Color 0 0 0)) -<
-       ((f, content''),
+     stackLayout' label -<
+         (stdLabelConfig{labelConfigFont = fId, labelConfigColor = c, labelConfigText = content''},
         ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing)))
      widgetOutput -<
-       ((stdParams, False),
-        \ (Bounds x0' y0' _x1' y1') ->
-          [DrawShape (Color 0 0 0)
+       ((stdParams{pWeightX = Just 0, pWeightY = Just 0}, False),
+        \ bs@(Bounds x0' y0' x1' y1') ->
+          [DrawShape c
              (Line (Coords (x0' + cx) (y0' + y0))
                 (Coords (x0' + cx) (y1' - y1)))
            | caret'' == caret0'', blink]
             ++
-            [DrawShape (Color 200 200 200)
+            [DrawShape cs
                (Rect
                   (Bounds (x0' + min cx cx') (y0' + y0) (x0' + max cx cx')
                      (y1' - y1)))
-             | caret'' /= caret0''])
-     widgetOutput -<
-       ((stdParams, False),
-        \ bs@(Bounds x0' y0' x1' y1') ->
-          [NinePatch np bs $
-             Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
+             | caret'' /= caret0'']
+              ++
+              [NinePatch np bs $
+                 Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
      returnA -< ((content'', caret'', caret0''), content'')
-  where
     keyChars evs ws x0 s = foldr f s evs
       where
         ws' = scanl (+) 0 ws
@@ -157,3 +212,6 @@ textfield p =
             let i' = fromMaybe (length s) $ findIndex (floor (mx - x0) <=) ws''
             in (s, i', i')
         f _ x = x
+
+textfield' :: Widget' t (Maybe String) String
+textfield' = proc ev -> textfield -< stdTextfieldConfig { textfieldConfigTextUpdate = ev }

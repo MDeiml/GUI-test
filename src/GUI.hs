@@ -98,12 +98,13 @@ instance MonadFix (GUI t) where
             return (a', ca)
 
 guiEvents :: GUI t [Event]
-guiEvents = GUI $  \g -> return (gEvents g, [])
+guiEvents = GUI $ \g -> return (gEvents g, [])
 
 guiResource :: ResourceId -> GUI t (Resource t)
-guiResource i = GUI $ \g -> do
-    res <- gResources g i
-    return (res, [])
+guiResource i =
+    GUI $ \g -> do
+        res <- gResources g i
+        return (res, [])
 
 guiTime :: GUI t Integer
 guiTime = GUI $ \g -> return (gTime g, [])
@@ -114,11 +115,11 @@ guiDraw c = GUI $ \_ -> return ((), map Render c)
 guiIO :: IO () -> GUI t ()
 guiIO m = GUI $ \_ -> return ((), [RunIO m])
 
-guiStartTextInput :: Bool -> GUI t ()
-guiStartTextInput b = GUI $ \_ -> return ((), [StartTextInput | b])
+guiStartTextInput :: GUI t ()
+guiStartTextInput = GUI $ \_ -> return ((), [StartTextInput])
 
-guiStopTextInput :: Bool -> GUI t ()
-guiStopTextInput b = GUI $ \_ -> return ((), [StopTextInput | b])
+guiStopTextInput :: GUI t ()
+guiStopTextInput = GUI $ \_ -> return ((), [StopTextInput])
 
 runGUI :: GUI t a -> Globals t -> IO (a, [Cmd t])
 runGUI (GUI f) = f

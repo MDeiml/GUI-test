@@ -6,6 +6,7 @@ module Lib
     , module Renderer
     , module Input
     , module Components
+    , module Resources
     ) where
 
 import Components
@@ -15,3 +16,4 @@ import Layout
 import Renderer
 import Types
 import Widget
+import Resources

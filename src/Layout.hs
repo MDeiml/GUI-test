@@ -143,13 +143,17 @@ stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
         bs = Bounds (xs + x0) (ys + y0) (xs + x0 + width) (ys + y0 + height)
         width =
             case pWeightX p of
-                Nothing -> pWidth (head ps)
-                Just 0 -> pWidth p
+                Nothing -> pWidth p
+                Just 0 -> case pWeightX (head ps) of
+                            Nothing -> pWidth (head ps)
+                            Just _ -> x1 - x0
                 Just _ -> x1 - x0
         height =
             case pWeightY p of
-                Nothing -> pHeight (head ps)
-                Just 0 -> pHeight p
+                Nothing -> pHeight p
+                Just 0 -> case pWeightY (head ps) of
+                            Nothing -> pHeight (head ps)
+                            Just _ -> y1 - y0
                 Just _ -> y1 - y0
         xs =
             case ax of
