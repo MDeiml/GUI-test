@@ -1,6 +1,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Renderer
     ( mainLoop
@@ -10,7 +11,6 @@ module Renderer
     , App
     ) where
 
-import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
@@ -19,7 +19,6 @@ import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BS
 import Data.IORef
 import qualified Data.Map as M
-import Data.Maybe
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Drawable
 import GUI
@@ -57,14 +56,33 @@ mainLoop r fps w0 = do
         clear r
         let gui = runGUI $ runWidget w [Bounds 0 0 width height] ()
         now <- getPOSIXTime
-        ~(~(_, ps, w'), ds) <-
+        ~(~(_, _, w'), ds) <-
             gui
                 Globals
                 { gEvents = events
                 , gTime = round $ now * 1000
                 , gResources = loadResource' r res
                 }
-        mapM_ (render r) $ reverse ds
+        mapM_
+            (\case
+                 Render d -> render r d
+                 RunIO m -> m
+                 _ -> return ()) $
+            reverse ds
+        when
+            (any
+                 (\case
+                      StopTextInput -> True
+                      _ -> False)
+                 ds) $
+            stopTextInput r
+        when
+            (any
+                 (\case
+                      StartTextInput -> True
+                      _ -> False)
+                 ds) $
+            startTextInput r
         swapBuffers r
         c <- closing r
         unless c $ mainLoop' w' res
@@ -96,3 +114,5 @@ class Renderer r t | r -> t where
     closing :: r -> IO Bool
     waitEvents :: r -> Double -> IO [Event]
     loadResource :: r -> ResourceId -> IO (Resource t)
+    startTextInput :: r -> IO ()
+    stopTextInput :: r -> IO ()

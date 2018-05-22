@@ -33,7 +33,6 @@ focusWidget =
     stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $
     proc _ ->
   do f <- focusListener -< ()
-     fOld <- shift False -< f
      let c = if f then Color 255 0 0 else Color 255 255 255
      widgetOutput -<
        ((stdParams{pWeightX = Just 1, pWeightY = Just 1}, False),

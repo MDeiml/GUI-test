@@ -6,20 +6,16 @@ module Input
     , focusListener
     , widgetOutput
     , widgetOutput'
-    , globals
     , resource
     , time
+    , events
     , debug
     , Widget'
     ) where
 
-import Control.Applicative
-import Control.Arrow
-import Control.Monad.IO.Class
 import Data.Maybe (mapMaybe)
 import Drawable
 import GUI
-import Graphics.UI.GLFW (Key(..))
 import Layout
 import Resources
 import Types
@@ -30,24 +26,26 @@ type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
 debug :: Widget' t String ()
 debug =
     buildWidget' $ \s -> do
-        liftIO $ putStrLn s
+        guiIO $ putStrLn s
         return ((), debug)
 
 resource :: Widget' t ResourceId (Resource t)
 resource =
     buildWidget' $ \i -> do
-        g <- guiGlobals
-        res <- liftIO $ gResources g i
+        res <- guiResource i
         return (res, resource)
 
-globals :: Widget' t () (Globals t)
-globals =
+events :: Widget' t () [Event]
+events =
     buildWidget' $ \_ -> do
-        g <- guiGlobals
-        return (g, globals)
+        es <- guiEvents
+        return (es, events)
 
 time :: Widget' t () Integer
-time = arr gTime <<< globals
+time =
+    buildWidget' $ \_ -> do
+        t <- guiTime
+        return (t, time)
 
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
 widgetOutput =
@@ -64,9 +62,9 @@ widgetOutput' =
 mouseListener :: Widget' t () [(MouseButton, ButtonState)]
 mouseListener =
     buildWidget $ \bs _ -> do
-        g <- guiGlobals
+        es <- guiEvents
         return
-            ( mapMaybe (f bs) (gEvents g)
+            ( mapMaybe (f bs) es
             , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)
             , mouseListener)
   where
@@ -83,8 +81,8 @@ focusListener = focusListener' False
   where
     focusListener' focus =
         buildWidget $ \bs _ -> do
-            g <- guiGlobals
-            let focus' = foldr (f' bs) focus $ gEvents g
+            es <- guiEvents
+            let focus' = foldr (f' bs) focus es
             return
                 ( focus'
                 , (stdParams {pWeightX = Just 0, pWeightY = Just 0}, False)

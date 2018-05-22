@@ -24,7 +24,7 @@ module Layout
 
 import Control.Monad.Fix
 import Data.List (transpose)
-import Data.Maybe (fromJust, isNothing, mapMaybe)
+import Data.Maybe (mapMaybe)
 import Types
 import Widget
 
@@ -90,7 +90,7 @@ widgetLayout f w = buildWidget $ runWidget' w Nothing
                 ~(~(calcBounds, p), reval') =
                     case mbs of
                         Nothing -> (f ps, True)
-                        Just ~(ps', p', cb, b, bs) ->
+                        Just ~(p', cb, b, bs) ->
                             if not reval
                                 then ( ( \x ->
                                              if x == b
@@ -103,7 +103,7 @@ widgetLayout f w = buildWidget $ runWidget' w Nothing
         return
             ( o
             , (p, reval')
-            , buildWidget $ runWidget' w' $ Just (ps, p, calcBounds, bs, bs'))
+            , buildWidget $ runWidget' w' $ Just (p, calcBounds, bs, bs'))
 
 stackLayout ::
        Margin
@@ -269,6 +269,8 @@ tableLayout1 colwidth (lx, ly) ps = (calcBounds, param)
         stackX _ _ [] = []
         stackX (w:ws) t (Bounds x0 y0 x1 y1:bs) =
             Bounds (x0 + t) y0 (x1 + t) y1 : stackX ws (w + t) bs
+        stackX _ _ _ = error "ws must be same length as bs"
         stackY _ _ [] = []
         stackY (h:hs) t (Bounds x0 y0 x1 y1:bs) =
             Bounds x0 (y0 + t) x1 (y1 + t) : stackY hs (h + t) bs
+        stackY _ _ _ = error "hs must be same length as bs"

@@ -10,13 +10,12 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.IORef
-import Data.Maybe (catMaybes, maybeToList)
+import Data.Maybe (maybeToList)
 import qualified Data.Text as T
 import Data.Vector.Storable (unsafeWith)
 import Data.Word
 import Drawable
 import Font
-import Foreign.C.Types
 import GUI
 import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
@@ -104,7 +103,6 @@ instance Renderer SDLRenderer Texture where
         defS <- createProgram ("default.vert", "default.frag")
         GL.blend $= GL.Enabled
         GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
-        S.startTextInput (SR.Rect 0 0 100 100)
         return
             SDLRenderer
             { window = win
@@ -150,7 +148,7 @@ instance Renderer SDLRenderer Texture where
                         kc =
                             fromIntegral $ S.unwrapKeycode $ S.keysymKeycode sym
                     in return [KeyEvent mod' kc ks]
-                S.TextEditingEvent d -> return []
+                S.TextEditingEvent _ -> return []
                 S.TextInputEvent d ->
                     return $ map CharEvent $ T.unpack $ S.textInputEventText d
                 S.MouseMotionEvent d ->
@@ -173,12 +171,14 @@ instance Renderer SDLRenderer Texture where
                                  (Coords (fromIntegral x) (fromIntegral y))
                            ]
                 _ -> return []
-    clear r = GL.clear [GL.ColorBuffer]
+    clear _ = GL.clear [GL.ColorBuffer]
     swapBuffers r = S.glSwapWindow $ window r
     getSize r = do
         (S.V2 w h) <- S.glGetDrawableSize $ window r
         return (fromIntegral w, fromIntegral h)
     closing r = readIORef $ closed r
+    startTextInput _ = S.startTextInput (SR.Rect 0 0 0 0)
+    stopTextInput _ = S.stopTextInput
     render re (DrawShape (Color r g b) (Rect (Bounds x0 y0 x1 y1))) = do
         renderInit re (defaultShader re)
         GL.textureBinding GL.Texture2D $= Nothing
@@ -339,7 +339,7 @@ instance Renderer SDLRenderer Texture where
         RFont <$> generateAtlas fontname size
     loadResource re (ResN fp) =
         maybe (RError "") RNin <$> runMaybeT (loadNinpatch re fp)
-    loadResource re (ResS fp) = do
+    loadResource _ (ResS fp) = do
         img <- P.readImage fp
         case img of
             Left s -> return $ RError s
@@ -348,6 +348,7 @@ instance Renderer SDLRenderer Texture where
                     P.ImageRGBA8 i ->
                         loadImage i GL.RGBA8 GL.RGBA GL.UnsignedByte
                     P.ImageRGB8 i -> loadImage i GL.RGB8 GL.RGB GL.UnsignedByte
+                    _ -> return $ RError "Unsupported image format"
       where
         loadImage img internal format datatype =
             unsafeWith (P.imageData img) $ \buf -> do

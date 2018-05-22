@@ -1,15 +1,12 @@
 {-# LANGUAGE Arrows #-}
 
-module Textfield
+module Textcomponent
     ( textfield
     , label
     , label'
     ) where
 
 import Control.Arrow
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.Char
 import Data.List (findIndex)
 import Data.Maybe
 import Drawable
@@ -22,21 +19,40 @@ import SDL.Internal.Numbered (toNumber)
 import Types
 import Widget
 
-type TextInputState = (String, Int)
+type TextInputState = (String, Int, Int)
+
+keyMovement ::
+       ((String, Int) -> Int) -> Modifiers -> TextInputState -> TextInputState
+keyMovement move m (s, i, j)
+    | mAlt m || mCtrl m = (s, i, j)
+    | mShift m = (s, i', j)
+    | otherwise = (s, i', i')
+  where
+    i' = max 0 $ min (length s) $ move (s, i)
 
 keyMap :: [(Key, Modifiers -> TextInputState -> TextInputState)]
 keyMap =
-    [ (f KeycodeBackspace, \_ (s, i) -> (take (i - 1) s ++ drop i s, i - 1))
-    , (f KeycodeHome, \_ (s, i) -> (s, 0)) -- TODO
-    , (f KeycodeDelete, \_ (s, i) -> (take i s ++ drop (i + 1) s, i))
-    , (f KeycodeEnd, \_ (s, i) -> (s, length s)) -- TODO
-    , (f KeycodeRight, \_ (s, i) -> (s, min (length s) (i + 1))) -- TODO !!!
-    , (f KeycodeLeft, \_ (s, i) -> (s, max 0 (i - 1))) -- TODO !!! up down
+    [ ( f KeycodeBackspace
+      , \_ (s, i, j) -> (take (i - 1) s ++ drop i s, i - 1, j - 1))
+    , (f KeycodeHome, keyMovement (const 0)) -- TODO
+    , (f KeycodeDelete, \_ (s, i, j) -> (take i s ++ drop (i + 1) s, i, j))
+    , (f KeycodeEnd, keyMovement (\(s, _) -> length s)) -- TODO
+    , (f KeycodeRight, keyMovement (\(_, i) -> i + 1)) -- TODO !!!
+    , (f KeycodeLeft, keyMovement (\(_, i) -> i - 1)) -- TODO !!! up down
     ]
   where
     f = fromIntegral . toNumber
 
 keyMap' k = fromMaybe (const id) $ lookup k keyMap
+
+textInputIO :: Widget' t Bool ()
+textInputIO = widgetState False w
+  where
+    w =
+        buildWidget' $ \(f', f) -> do
+            guiStartTextInput (f && not f')
+            guiStopTextInput (f' && not f)
+            return ((f, ()), w)
 
 label :: Color -> Widget' t (Font t, String) ()
 label c =
@@ -71,10 +87,11 @@ label' size =
 textfield :: LayoutParam -> Widget' t (Maybe String) String
 textfield p =
     stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (pWeightX p, pWeightY p) $
-    widgetState ("", 0) $
-    proc ((content, caret), ev) ->
-  do let (content', caret')
-           = maybe (content, caret) (\ s -> (s, length s)) ev
+    widgetState ("", 0, 0) $
+    proc ((content, caret, caret0), ev) ->
+  do let (content', caret', caret0')
+           = maybe (content, caret, caret0) (\ s -> (s, length s, length s))
+               ev
      RNin np <- resource -< ResN "textfield.json"
      let NP (Sprite _ w h) (xs, ys, xe, ye) = np
          x0 = fromIntegral w * xs
@@ -83,8 +100,9 @@ textfield p =
          y1 = fromIntegral h * (1 - ye)
      bs <- bounds -< (p, False)
      let ~(Bounds x0' y0' x1' y1') = bs
-     g <- globals -< ()
+     es <- events -< ()
      focus <- focusListener -< ()
+     textInputIO -< focus
      RFont f <- resource -<
                   ResF 20 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
      let ws
@@ -92,15 +110,17 @@ textfield p =
                ((\ (_, _, _, _, x) -> x) .
                   fontMetrics f . fromIntegral . fromEnum)
                content'
-     let (content'', caret'')
-           = if focus then keyChars g ws (x0' + x0) bs (content', caret') else
-               (content', caret')
+     let (content'', caret'', caret0'')
+           = if focus then
+               keyChars es ws (x0' + x0) bs (content', caret', caret0') else
+               (content', caret', caret0')
      let ws'
            = map
                ((\ (_, _, _, _, x) -> x) .
                   fontMetrics f . fromIntegral . fromEnum)
                content''
      let cx = x0 + fromIntegral (sum $ take caret'' ws')
+     let cx' = x0 + fromIntegral (sum $ take caret0'' ws')
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
      constLayout' $ stackLayout' (label (Color 0 0 0)) -<
@@ -111,23 +131,32 @@ textfield p =
        [DrawShape (Color 0 0 0)
           (Line (Coords (x0' + cx) (y0' + y0))
              (Coords (x0' + cx) (y1' - y1)))
-        | blink]
+        | caret'' == caret0'', blink]
+         ++
+         [DrawShape (Color 200 200 200)
+            (Rect
+               (Bounds (x0' + min cx cx') (y0' + y0) (x0' + max cx cx')
+                  (y1' - y1)))
+          | caret'' /= caret0'']
      widgetOutput' -<
        [NinePatch np bs $
           Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)]
-     returnA -< ((content'', caret''), content'')
+     returnA -< ((content'', caret'', caret0''), content'')
   where
-    keyChars g ws x0 bs (c, i) = foldr f (c, i) evs
+    keyChars evs ws x0 bs s = foldr f s evs
       where
         ws' = scanl (+) 0 ws
         ws'' = zipWith (\a b -> (a + b) `quot` 2) ws' (tail ws')
-        evs = gEvents g
         f (KeyEvent m k KeyDown) x = keyMap' k m x
-        f (CharEvent c) (s, j) = (take j s ++ [c] ++ drop j s, j + 1)
-        f (MouseEvent 0 ButtonDown c@(Coords mx _my)) (s, j) =
+        f (CharEvent c) (s, i, j) =
+            ( take (min i j) s ++ [c] ++ drop (max i j) s
+            , min i j + 1
+            , min i j + 1)
+        f (MouseEvent 1 ButtonDown c@(Coords mx _my)) (s, i, j) =
             if c `inside` bs
-                then ( s
-                     , fromMaybe (length s) $
-                       findIndex (floor (mx - x0) <=) ws'')
-                else (s, j)
-        f _ (s, j) = (s, j)
+                then let i' =
+                             fromMaybe (length s) $
+                             findIndex (floor (mx - x0) <=) ws''
+                     in (s, i', i')
+                else (s, i - 1, j)
+        f _ x = x

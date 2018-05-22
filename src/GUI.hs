@@ -10,17 +10,27 @@ module GUI
     , Key
     , Modifiers(..)
     , GUI
-    , guiGlobals
+    , Cmd(..)
+    , guiResource
+    , guiEvents
+    , guiTime
     , guiDraw
+    , guiIO
+    , guiStartTextInput
+    , guiStopTextInput
     , runGUI
     ) where
 
 import Control.Monad.Fix
-import Control.Monad.IO.Class
-import Data.IORef
 import Drawable
 import Resources
 import Types
+
+data Cmd t
+    = Render (Drawable t)
+    | RunIO (IO ())
+    | StartTextInput
+    | StopTextInput
 
 data Globals t = Globals
     { gEvents :: [Event]
@@ -61,7 +71,7 @@ data Event
     deriving (Show)
 
 newtype GUI t a =
-    GUI (Globals t -> IO (a, [Drawable t]))
+    GUI (Globals t -> IO (a, [Cmd t]))
     deriving (Functor)
 
 instance Applicative (GUI t) where
@@ -87,14 +97,28 @@ instance MonadFix (GUI t) where
             ~(a', ca) <- a g
             return (a', ca)
 
-instance MonadIO (GUI t) where
-    liftIO a = GUI $ \_ -> fmap (\x -> (x, [])) a
+guiEvents :: GUI t [Event]
+guiEvents = GUI $  \g -> return (gEvents g, [])
 
-guiGlobals :: GUI t (Globals t)
-guiGlobals = GUI $ \g -> return (g, [])
+guiResource :: ResourceId -> GUI t (Resource t)
+guiResource i = GUI $ \g -> do
+    res <- gResources g i
+    return (res, [])
+
+guiTime :: GUI t Integer
+guiTime = GUI $ \g -> return (gTime g, [])
 
 guiDraw :: [Drawable t] -> GUI t ()
-guiDraw c = GUI $ \_ -> return ((), c)
+guiDraw c = GUI $ \_ -> return ((), map Render c)
 
-runGUI :: GUI t a -> Globals t -> IO (a, [Drawable t])
+guiIO :: IO () -> GUI t ()
+guiIO m = GUI $ \_ -> return ((), [RunIO m])
+
+guiStartTextInput :: Bool -> GUI t ()
+guiStartTextInput b = GUI $ \_ -> return ((), [StartTextInput | b])
+
+guiStopTextInput :: Bool -> GUI t ()
+guiStopTextInput b = GUI $ \_ -> return ((), [StopTextInput | b])
+
+runGUI :: GUI t a -> Globals t -> IO (a, [Cmd t])
 runGUI (GUI f) = f

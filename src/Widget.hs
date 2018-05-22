@@ -13,7 +13,6 @@ module Widget
 import Control.Arrow
 import Control.Category
 import Control.Monad.Fix
-import GUI
 import Prelude hiding ((.), id)
 import Types
 
@@ -86,4 +85,4 @@ instance MonadFix m => ArrowChoice (Widget p m) where
         runWidget' bs (Left i) = do
             ~(o, p, w) <- runWidget a bs i
             return (Left o, p, left w)
-        runWidget' bs (Right i) = return (Right i, [], left a)
+        runWidget' _ (Right i) = return (Right i, [], left a)

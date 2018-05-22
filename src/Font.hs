@@ -7,15 +7,11 @@ import Data.ByteArray (withByteArray)
 import qualified Data.ByteString as BS
 import Data.List (sortBy)
 import Data.Maybe
-import Data.Time
 import Foreign
 import Foreign.C.String
 import Graphics.Rendering.FreeType.Internal
 import Graphics.Rendering.FreeType.Internal.Bitmap
-import qualified Graphics.Rendering.FreeType.Internal.BitmapSize
-       as BS
 import Graphics.Rendering.FreeType.Internal.Face
-import Graphics.Rendering.FreeType.Internal.FaceType
 import qualified Graphics.Rendering.FreeType.Internal.GlyphMetrics
        as GM
 import Graphics.Rendering.FreeType.Internal.GlyphSlot
@@ -23,7 +19,6 @@ import Graphics.Rendering.FreeType.Internal.Library
 import Graphics.Rendering.FreeType.Internal.PrimitiveTypes
 import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
-import qualified Graphics.UI.GLFW as G
 import Resources
 import System.IO.Unsafe
 import Texture
@@ -176,16 +171,6 @@ generateAtlas fp px = do
         , fontname = fp
         , fontsize = px
         }
-
-set :: (Show a) => [[a]] -> [[a]] -> (Int, Int) -> [[a]]
-set a [] _ = a
-set a'@(a:as) b'@(b:bs) (x, y)
-    | y /= 0 =
-        unsafePerformIO $
-        print (length b', length $ head b', x, y) >>
-        return (take y a' ++ set (drop y a') b' (x, 0))
-    | otherwise = (take x a ++ b ++ drop (x + length b) a) : set as bs (x, 0)
-set a b c = error $ show (a, b, c)
 
 bitmapToTexture :: Int -> Int -> [Word8] -> IO GL.TextureObject
 bitmapToTexture w h bmp = do

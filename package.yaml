@@ -24,7 +24,6 @@ dependencies:
 - bytestring >= 0.10 && < 1
 - containers >= 0.5 && < 1
 - freetype2 >= 0.1 && < 2
-- GLFW-b >= 3.2 && < 4
 - memory >= 0.14 && < 1
 - OpenGL >= 3.0 && < 4
 - time >= 1.6 && < 2
@@ -47,6 +46,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -O3
+    - -W
     dependencies:
     - gui-test
 

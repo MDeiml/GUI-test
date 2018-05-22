@@ -7,23 +7,18 @@ module Components
     , evLast'
     , debug
     , once
-    , module Textfield
+    , image
+    , module Textcomponent
     ) where
 
 import Control.Applicative
 import Control.Arrow
-import Control.Monad.IO.Class
-import Data.IORef
-import qualified Data.Map as M
 import Data.Maybe
 import Drawable
-import GUI
-import Graphics.UI.GLFW (Key(..))
 import Input
 import Layout
 import Resources
-import Textfield
-import Types
+import Textcomponent
 import Widget
 
 background :: Color -> Widget' t () ()
