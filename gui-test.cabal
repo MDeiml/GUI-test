@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0a30a403e9900874d04cad1fa962d0dad6c14361b36c3e3720a7cbf84e4d18ed
+-- hash: 023d564b638e8477f37b1d6c2318f23a34bc7967d1de0b43aac7abc8fcc03ece
 
 name:           gui-test
 version:        0.1.0.0
@@ -53,6 +53,7 @@ library
     , containers >=0.5 && <1
     , freetype2 >=0.1 && <2
     , memory >=0.14 && <1
+    , process >=1.6 && <2
     , sdl2 >=2.4 && <3
     , text >=1.1 && <2
     , time >=1.6 && <2
@@ -77,6 +78,7 @@ executable gui-test-exe
     , freetype2 >=0.1 && <2
     , gui-test
     , memory >=0.14 && <1
+    , process >=1.6 && <2
     , sdl2 >=2.4 && <3
     , text >=1.1 && <2
     , time >=1.6 && <2
@@ -102,6 +104,7 @@ test-suite gui-test-test
     , freetype2 >=0.1 && <2
     , gui-test
     , memory >=0.14 && <1
+    , process >=1.6 && <2
     , sdl2 >=2.4 && <3
     , text >=1.1 && <2
     , time >=1.6 && <2

@@ -77,7 +77,7 @@ stdLabelConfig =
     }
 
 stdFont :: ResourceId
-stdFont = ResF 20 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
+stdFont = ResF 20 "Ubuntu"
 
 label :: Widget' t LabelConfig ()
 label =

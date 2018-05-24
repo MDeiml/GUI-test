@@ -58,7 +58,7 @@ test4 =
      let secs = (t - t0) `quot` 1000
      label -<
        stdLabelConfig{labelConfigFont =
-                        ResF 60 "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+                        ResF 60 "Ubuntu",
                       labelConfigText = show secs}
      widgetOutput -<
        ((stdParams, False), (: []) . DrawShape (Color 255 0 0) . Rect)

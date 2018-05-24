@@ -1,11 +1,12 @@
 module Font
     ( generateAtlas
+    , getFontPath
     ) where
 
 import Control.Monad
 import Data.ByteArray (withByteArray)
 import qualified Data.ByteString as BS
-import Data.List (sortBy)
+import Data.List (elemIndex, sortOn)
 import Data.Maybe
 import Foreign
 import Foreign.C.String
@@ -21,6 +22,7 @@ import qualified Graphics.Rendering.OpenGL as GL
 import Graphics.Rendering.OpenGL (($=))
 import Resources
 import System.IO.Unsafe
+import System.Process
 import Texture
 
 data Glyph = Glyph
@@ -94,7 +96,7 @@ layoutGlyphs glyphs =
           lookup x $ zip (map gCharcode sorted) metrics
     , size)
   where
-    sorted = sortBy (\a b -> compare (gHeight b) (gHeight a)) glyphs
+    sorted = sortOn (negate . gHeight) glyphs
     ((bmp, pos), size) =
         head $
         catMaybes
@@ -209,3 +211,27 @@ fontFace fp =
         alloca $ \ptr -> do
             runFreeType $ ft_New_Face freeType str 0 ptr
             peek ptr
+
+getFontPath :: String -> Bool -> Bool -> IO FilePath
+getFontPath fontname bold italic = do
+    out <- readProcess "fc-list" [fontname] ""
+    let tokens = map (split ':') $ lines out
+        styles = map (split ',' . drop (length "style=") . (!! 2)) tokens
+        isBold = map (elem "Bold") styles
+        isItalic = map (elem "Italic") styles
+        isBoldItalic = map (elem "Bold Italic") styles
+        bold' = bold && not italic
+        italic' = italic && not bold
+        boldItalic = bold && italic
+        tokens' =
+            map fst $
+            filter ((== (bold', italic', boldItalic)) . snd) $
+            zip tokens $ zip3 isBold isItalic isBoldItalic
+        tokens'' = sortOn (\a -> length (a !! 1 ++ a !! 2)) tokens'
+        paths = map head tokens''
+    return (head paths)
+  where
+      split c s = case elemIndex c s of
+                    Nothing -> [s]
+                    Just i -> let (a, b) = splitAt i s
+                               in a : split c (tail b)

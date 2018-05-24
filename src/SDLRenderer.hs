@@ -336,7 +336,8 @@ instance Renderer SDLRenderer Texture where
                     text
     loadResource re (ResF size fontname) = do
         S.glMakeCurrent (window re) (context re)
-        RFont <$> generateAtlas fontname size
+        path <- getFontPath fontname False False
+        RFont <$> generateAtlas path size
     loadResource re (ResN fp) =
         maybe (RError "") RNin <$> runMaybeT (loadNinpatch re fp)
     loadResource _ (ResS fp) = do
