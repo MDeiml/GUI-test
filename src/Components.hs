@@ -4,13 +4,11 @@ module Components
     ( background
     , initial
     , evLast
-    , evLast'
     , debug
     , image
     , module Textcomponent
     ) where
 
-import Control.Applicative
 import Control.Arrow
 import Data.Maybe
 import Drawable
@@ -40,16 +38,10 @@ image =
 initial :: Widget' t a a
 initial = buildWidget' $ \i -> return (i, arr $ const i)
 
-evLast :: Widget' t (Maybe a) (Maybe a)
-evLast = evLast1 Nothing
+evLast :: a -> Widget' t (Maybe a) a
+evLast = evLast1
   where
     evLast1 s =
         buildWidget' $ \i ->
-            let new = i <|> s
+            let new = fromMaybe s i
             in return (new, evLast1 new)
-
-evLast' :: a -> Widget' t (Maybe a) a
-evLast' x =
-    buildWidget' $ \i ->
-        let new = fromMaybe x i
-        in return (new, evLast' new)

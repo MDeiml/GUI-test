@@ -1,20 +1,20 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Resources
-    ( Resource(..)
-    , ResourceId(..)
-    , Resources
+    ( ResourceId(..)
     , Font(..)
     , Sprite(..)
     , NinePatch(..)
+    , Resources(..)
+    , resLookup
+    , resInsert
+    , resEmpty
     ) where
 
 import qualified Data.Map as M
-
-data Resource t
-    = RFont (Font t)
-    | RSpr (Sprite t)
-    | RNin (NinePatch t)
-    | RError String
-    deriving (Show, Eq)
+import Data.Monoid
 
 data Sprite t =
     Sprite t
@@ -36,14 +36,46 @@ data NinePatch t =
        (Float, Float, Float, Float)
     deriving (Show, Eq)
 
-data ResourceId
-    = ResF Int
-           String
-    | ResS FilePath
-    | ResN FilePath
-    deriving (Eq, Ord, Show)
+data ResourceId a where
+    ResF :: Int -> String -> ResourceId Font
+    ResS :: FilePath -> ResourceId Sprite
+    ResN :: FilePath -> ResourceId NinePatch
 
-type Resources t = M.Map ResourceId (Resource t)
+deriving instance Eq (ResourceId a)
+
+deriving instance Show (ResourceId a)
+
+instance Ord (ResourceId Font) where
+    compare (ResF s1 n1) (ResF s2 n2) = compare s1 s2 <> compare n1 n2
+
+instance Ord (ResourceId Sprite) where
+    compare (ResS f1) (ResS f2) = compare f1 f2
+
+instance Ord (ResourceId NinePatch) where
+    compare (ResN f1) (ResN f2) = compare f1 f2
+
+type ResourceMap a t = M.Map (ResourceId a) (a t)
+
+data Resources t = Resources
+    { resourceFonts :: ResourceMap Font t
+    , resourceSprites :: ResourceMap Sprite t
+    , resourceNinePatches :: ResourceMap NinePatch t
+    }
+
+resEmpty = Resources M.empty M.empty M.empty
+
+resLookup :: ResourceId a -> Resources t -> Maybe (a t)
+resLookup i@(ResF _ _) = M.lookup i . resourceFonts
+resLookup i@(ResS _) = M.lookup i . resourceSprites
+resLookup i@(ResN _) = M.lookup i . resourceNinePatches
+
+resInsert :: ResourceId a -> a t -> Resources t -> Resources t
+resInsert i@(ResF _ _) r res =
+    res {resourceFonts = M.insert i r $ resourceFonts res}
+resInsert i@(ResS _) r res =
+    res {resourceSprites = M.insert i r $ resourceSprites res}
+resInsert i@(ResN _) r res =
+    res {resourceNinePatches = M.insert i r $ resourceNinePatches res}
 
 instance Show (Font t) where
     show f = "Font " ++ show (fontname f) ++ " " ++ show (fontsize f)

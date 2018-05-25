@@ -15,6 +15,7 @@ module Input
     ) where
 
 import Control.Arrow
+import Control.Monad
 import Data.Maybe (mapMaybe)
 import Drawable
 import GUI
@@ -29,38 +30,20 @@ once :: a -> Widget' t () (Maybe a)
 once x = buildWidget' $ const $ return (Just x, arr $ const Nothing)
 
 debug :: Widget' t String ()
-debug =
-    buildWidget' $ \s -> do
-        guiIO $ putStrLn s
-        return ((), debug)
+debug = buildWidgetStatic' $ void . guiIO . putStrLn
 
-resource :: Widget' t ResourceId (Resource t)
-resource =
-    buildWidget' $ \i -> do
-        res <- guiResource i
-        return (res, resource)
+resource :: Widget' t (ResourceId a) (Either String (a t))
+resource = buildWidgetStatic' guiResource
 
 events :: Widget' t () [Event]
-events =
-    buildWidget' $ \_ -> do
-        es <- guiEvents
-        return (es, events)
+events = buildWidgetStatic' $ const guiEvents
 
 time :: Widget' t () Integer
-time =
-    buildWidget' $ \_ -> do
-        t <- guiTime
-        return (t, time)
+time = buildWidgetStatic' $ const guiTime
 
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
 widgetOutput =
-    buildWidget $ \(p, r) ->
-        return
-            ( ()
-            , p
-            , \bs -> do
-                  guiDraw $ r bs
-                  return widgetOutput)
+    buildWidgetStatic $ \(p, r) -> return ((), p, \bs -> do guiDraw $ r bs)
 
 widgetOutput' :: Widget' t [Drawable t] ()
 widgetOutput' =
@@ -80,7 +63,7 @@ mouseListener = buildWidget $ runWidget' (Bounds 0 0 0 0)
     f bs@(Bounds x0 y0 _ _) e =
         case e of
             MouseEvent but butS c@(Coords x y) ->
-                if c `inside` bs -- HELP!!!
+                if c `inside` bs
                     then Just (MouseEvent but butS (Coords (x - x0) (y - y0)))
                     else Nothing
             e -> Just e

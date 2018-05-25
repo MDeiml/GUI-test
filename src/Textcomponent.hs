@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows #-}
+{-# LANGUAGE GADTs #-}
 
 module Textcomponent
     ( textfield
@@ -54,16 +55,15 @@ keyMap =
 keyMap' k = fromMaybe (const id) $ lookup k keyMap
 
 textInputIO :: Widget' t Bool ()
-textInputIO = widgetState False w
-  where
-    w =
-        buildWidget' $ \(f', f) -> do
-            when (f && not f') guiStartTextInput
-            when (f' && not f) guiStopTextInput
-            return ((f, ()), w)
+textInputIO =
+    widgetState False $
+    buildWidgetStatic' $ \(f', f) -> do
+        when (f && not f') guiStartTextInput
+        when (f' && not f) guiStopTextInput
+        return (f, ())
 
 data LabelConfig = LabelConfig
-    { labelConfigFont :: ResourceId
+    { labelConfigFont :: ResourceId Font
     , labelConfigColor :: Color
     , labelConfigText :: String
     }
@@ -76,7 +76,7 @@ stdLabelConfig =
     , labelConfigText = ""
     }
 
-stdFont :: ResourceId
+stdFont :: ResourceId Font
 stdFont = ResF 20 "Ubuntu"
 
 label :: Widget' t LabelConfig ()
@@ -85,7 +85,7 @@ label =
   do let s = labelConfigText config
          fId = labelConfigFont config
          c = labelConfigColor config
-     RFont f <- resource -< fId
+     Right f <- resource -< fId
      s' <- shift Nothing -< Just s
      let w = fromIntegral $
                sum $
@@ -110,8 +110,8 @@ data TextfieldConfig = TextfieldConfig
     { textfieldConfigText :: String
     , textfieldConfigTextUpdate :: Maybe String
     , textfieldConfigLayoutParam :: LayoutParam
-    , textfieldConfigFont :: ResourceId
-    , textfieldConfigNinepatch :: ResourceId
+    , textfieldConfigFont :: ResourceId Font
+    , textfieldConfigNinepatch :: ResourceId NinePatch
     , textfieldConfigTextColor :: Color
     , textfieldConfigSelectColor :: Color
     }
@@ -151,7 +151,7 @@ textfield =
      let ~(content', caret', caret0')
            = maybe last (\ s -> (s, length s, length s))
                (ev <|> fmap (const initText) initEv)
-     RNin np <- resource -< nId
+     Right np <- resource -< nId
      let NP (Sprite _ w h) (xs, ys, xe, ye) = np
          x0 = fromIntegral w * xs
          y0 = fromIntegral h * ys
@@ -161,7 +161,7 @@ textfield =
      es <- mouseListener -< ()
      focus <- focusListener -< ()
      textInputIO -< focus
-     RFont f <- resource -< fId
+     Right f <- resource -< fId
      let ws
            = map
                ((\ (_, _, _, _, x) -> x) .
@@ -180,7 +180,8 @@ textfield =
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
      stackLayout' label -<
-         (stdLabelConfig{labelConfigFont = fId, labelConfigColor = c, labelConfigText = content''},
+       (stdLabelConfig{labelConfigFont = fId, labelConfigColor = c,
+                       labelConfigText = content''},
         ((x0, y0, x1, y1), (AlignStart, AlignCenter), (Nothing, Nothing)))
      widgetOutput -<
        ((stdParams{pWeightX = Just 0, pWeightY = Just 0}, False),
@@ -204,14 +205,16 @@ textfield =
         ws' = scanl (+) 0 ws
         ws'' = zipWith (\a b -> (a + b) `quot` 2) ws' (tail ws')
         f (KeyEvent m k KeyDown) x = keyMap' k m x
-        f (CharEvent c) (s, i, j) =
-            ( take (min i j) s ++ [c] ++ drop (max i j) s
-            , min i j + 1
-            , min i j + 1)
+        f (TextEvent c) (s, i, j) =
+            ( take (min i j) s ++ c ++ drop (max i j) s
+            , min i j + length c
+            , min i j + length c)
         f (MouseEvent 1 ButtonDown (Coords mx _my)) (s, _, _) =
             let i' = fromMaybe (length s) $ findIndex (floor (mx - x0) <=) ws''
             in (s, i', i')
         f _ x = x
 
 textfield' :: Widget' t (Maybe String) String
-textfield' = proc ev -> textfield -< stdTextfieldConfig { textfieldConfigTextUpdate = ev }
+textfield' =
+    proc ev ->
+  textfield -< stdTextfieldConfig{textfieldConfigTextUpdate = ev}

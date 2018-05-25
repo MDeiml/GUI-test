@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE Rank2Types #-}
 
 module GUI
     ( Globals(..)
@@ -25,6 +26,7 @@ import Control.Monad.Fix
 import Drawable
 import Resources
 import Types
+import Control.Monad.IO.Class
 
 data Cmd t
     = Render (Drawable t)
@@ -35,7 +37,7 @@ data Cmd t
 data Globals t = Globals
     { gEvents :: [Event]
     , gTime :: Integer
-    , gResources :: ResourceId -> IO (Resource t)
+    , gResources :: forall a. ResourceId a -> IO (Either String (a t))
     }
 
 data KeyState
@@ -63,7 +65,7 @@ data Event
     = KeyEvent Modifiers
                Key
                KeyState
-    | CharEvent Char
+    | TextEvent String
     | MouseEvent MouseButton
                  ButtonState
                  Coords
@@ -97,10 +99,13 @@ instance MonadFix (GUI t) where
             ~(a', ca) <- a g
             return (a', ca)
 
+instance MonadIO (GUI t) where
+    liftIO m = GUI $ const $ fmap (\x -> (x,[])) m
+
 guiEvents :: GUI t [Event]
 guiEvents = GUI $ \g -> return (gEvents g, [])
 
-guiResource :: ResourceId -> GUI t (Resource t)
+guiResource :: ResourceId a -> GUI t (Either String (a t))
 guiResource i =
     GUI $ \g -> do
         res <- gResources g i

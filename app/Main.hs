@@ -89,7 +89,7 @@ test5 =
     a =
         linearLayout Vertical (Nothing, Nothing) $
         proc _ -> do
-     n <- evLast' 5 <<< inp -< ()
+     n <- evLast 5 <<< inp -< ()
      label' -< show n
 
 test :: IO ()

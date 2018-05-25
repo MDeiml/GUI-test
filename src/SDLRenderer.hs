@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 
 module SDLRenderer
     ( SDLRenderer
@@ -150,7 +151,7 @@ instance Renderer SDLRenderer Texture where
                     in return [KeyEvent mod' kc ks]
                 S.TextEditingEvent _ -> return []
                 S.TextInputEvent d ->
-                    return $ map CharEvent $ T.unpack $ S.textInputEventText d
+                    return [TextEvent $ T.unpack $ S.textInputEventText d]
                 S.MouseMotionEvent d ->
                     let (S.P (S.V2 x y)) = S.mouseMotionEventPos d
                     in return
@@ -337,19 +338,19 @@ instance Renderer SDLRenderer Texture where
     loadResource re (ResF size fontname) = do
         S.glMakeCurrent (window re) (context re)
         path <- getFontPath fontname False False
-        RFont <$> generateAtlas path size
+        Right <$> generateAtlas path size
     loadResource re (ResN fp) =
-        maybe (RError "") RNin <$> runMaybeT (loadNinpatch re fp)
+        maybe (Left "") Right <$> runMaybeT (loadNinpatch re fp)
     loadResource _ (ResS fp) = do
         img <- P.readImage fp
         case img of
-            Left s -> return $ RError s
+            Left s -> return $ Left s
             Right img' ->
                 case img' of
                     P.ImageRGBA8 i ->
                         loadImage i GL.RGBA8 GL.RGBA GL.UnsignedByte
                     P.ImageRGB8 i -> loadImage i GL.RGB8 GL.RGB GL.UnsignedByte
-                    _ -> return $ RError "Unsupported image format"
+                    _ -> return $ Left "Unsupported image format"
       where
         loadImage img internal format datatype =
             unsafeWith (P.imageData img) $ \buf -> do
@@ -371,4 +372,4 @@ instance Renderer SDLRenderer Texture where
                     (GL.Repeated, GL.ClampToEdge)
                 GL.textureWrapMode GL.Texture2D GL.T $=
                     (GL.Repeated, GL.ClampToEdge)
-                return $ RSpr $ Sprite (Texture (tex, 0, 0, 1, 1)) w h
+                return $ Right $ Sprite (Texture (tex, 0, 0, 1, 1)) w h

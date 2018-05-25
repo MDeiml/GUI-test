@@ -18,7 +18,6 @@ import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BS
 import Data.IORef
-import qualified Data.Map as M
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Drawable
 import GUI
@@ -33,20 +32,23 @@ loadResource' ::
        (Renderer r t)
     => r
     -> IORef (Resources t)
-    -> ResourceId
-    -> IO (Resource t)
+    -> ResourceId a
+    -> IO (Either String (a t))
 loadResource' r ress i = do
     ress' <- readIORef ress
-    case M.lookup i ress' of
-        Just res -> return res
+    case resLookup i ress' of
+        Just res -> return $ Right res
         Nothing -> do
             res <- loadResource r i
-            writeIORef ress $ M.insert i res ress'
-            return res
+            case res of
+                Left s -> return $ Left s
+                Right res' -> do
+                    writeIORef ress $ resInsert i res' ress'
+                    return res
 
 mainLoop :: (Renderer r t) => r -> Int -> App t -> IO ()
 mainLoop r fps w0 = do
-    res <- newIORef M.empty
+    res <- newIORef resEmpty
     mainLoop' w0 res
   where
     frameTime = 1 / fromIntegral fps
@@ -102,7 +104,7 @@ loadNinpatch r fp = do
             xe' <- obj .: "xe"
             ye' <- obj .: "ye"
             return (texFile, xs', ys', xe', ye')
-    RSpr tex@(Sprite _ w h) <- lift $ loadResource r $ ResS tf
+    Right tex@(Sprite _ w h) <- lift $ loadResource r $ ResS tf
     let f = fromIntegral
     return $ NP tex (f xs / f w, f ys / f h, f xe / f w, f ye / f h)
 
@@ -114,6 +116,6 @@ class Renderer r t | r -> t where
     getSize :: r -> IO (Float, Float)
     closing :: r -> IO Bool
     waitEvents :: r -> Double -> IO [Event]
-    loadResource :: r -> ResourceId -> IO (Resource t)
+    loadResource :: r -> ResourceId a -> IO (Either String (a t))
     startTextInput :: r -> IO ()
     stopTextInput :: r -> IO ()
