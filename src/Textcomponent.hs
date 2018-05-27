@@ -73,8 +73,7 @@ data LabelConfig = LabelConfig
     }
 
 stdLabelConfig :: LabelConfig
-stdLabelConfig =
-    LabelConfig
+stdLabelConfig = LabelConfig
     { labelConfigFont = stdFont
     , labelConfigColor = Color 0 0 0
     , labelConfigText = ""
@@ -84,8 +83,7 @@ stdFont :: ResourceId Font
 stdFont = ResF 20 "Ubuntu"
 
 label :: Widget' t LabelConfig ()
-label =
-    proc config ->
+label = proc config ->
   do let s = labelConfigText config
          fId = labelConfigFont config
          c = labelConfigColor config
@@ -97,15 +95,13 @@ label =
                    ((\ (_, _, _, _, x) -> x) .
                        fontMetrics f . fromIntegral . fromEnum) $
                    Text.unpack s
-         h = fromIntegral (ascent f - descent f) + 1.2 * count '\n' (Text.unpack s)
+         nls = count '\n' $ Text.unpack s
+         h = fromIntegral (ascent f - descent f) + 1.2 * fromIntegral nls
      widgetOutput -<
        ((stdParams{pHeight = h, pWidth = w}, Just s /= s'),
         \ ~(Bounds x y _ _) -> [DrawShape c $ DrawText s (Coords x y) f])
   where
-    count _ [] = 0
-    count a (x:xs)
-        | a == x = 1 + count a xs
-        | otherwise = count a xs
+      count a = length . filter (==a)
 
 label' :: Widget' t Text ()
 label' = proc s -> label -< stdLabelConfig{labelConfigText = s}
@@ -121,8 +117,7 @@ data TextfieldConfig = TextfieldConfig
     }
 
 stdTextfieldConfig :: TextfieldConfig
-stdTextfieldConfig =
-    TextfieldConfig
+stdTextfieldConfig = TextfieldConfig
     { textfieldConfigText = ""
     , textfieldConfigTextUpdate = Nothing
     , textfieldConfigLayoutParam = stdParams {pWidth = 80, pHeight = 30}
@@ -166,21 +161,17 @@ textfield =
      focus <- focusListener -< ()
      textInputIO -< focus
      Right f <- resource -< fId
-     let ws
-           = map
-               ((\ (_, _, _, _, x) -> x) .
+     let ws = map ((\ (_, _, _, _, x) -> x) .
                    fontMetrics f . fromIntegral . fromEnum) $
                        Text.unpack content'
-     let ~(content'', caret'', caret0'')
-           = if focus then keyChars es ws x0 (content', caret', caret0') else
-               (content', caret', caret0')
-     let ws'
-           = map
-               ((\ (_, _, _, _, x) -> x) .
+         ~(content'', caret'', caret0'') = if focus
+             then keyChars es ws x0 (content', caret', caret0')
+             else (content', caret', caret0')
+         ws' = map ((\ (_, _, _, _, x) -> x) .
                    fontMetrics f . fromIntegral . fromEnum) $
                        Text.unpack content''
-     let cx = x0 + fromIntegral (sum $ take caret'' ws')
-     let cx' = x0 + fromIntegral (sum $ take caret0'' ws')
+         cx = x0 + fromIntegral (sum $ take caret'' ws')
+         cx' = x0 + fromIntegral (sum $ take caret0'' ws')
      t <- time -< ()
      let blink = ((t `quot` 1000) `mod` 2) == 0 && focus
      stackLayout' label -<
@@ -190,18 +181,13 @@ textfield =
      widgetOutput -<
        ((stdParams{pWeightX = Just 0, pWeightY = Just 0}, False),
         \ bs@(Bounds x0' y0' x1' y1') ->
-          [DrawShape c
-             (Line (Coords (x0' + cx) (y0' + y0))
-                (Coords (x0' + cx) (y1' - y1)))
-           | caret'' == caret0'', blink]
-            ++
-            [DrawShape cs
-               (Rect
+          [DrawShape c (Line (Coords (x0' + cx) (y0' + y0))
+                (Coords (x0' + cx) (y1' - y1))) | caret'' == caret0'', blink]
+            ++ [DrawShape cs (Rect
                   (Bounds (x0' + min cx cx') (y0' + y0) (x0' + max cx cx')
                      (y1' - y1)))
              | caret'' /= caret0'']
-              ++
-              [NinePatch np bs $
+            ++ [NinePatch np bs $
                  Bounds (x0' + x0) (y0' + y0) (x1' - x1) (y1' - y1)])
      returnA -< ((content'', caret'', caret0''), content'')
     keyChars evs ws x0 s = foldr f s evs
@@ -214,11 +200,11 @@ textfield =
             , min i j + Text.length c
             , min i j + Text.length c)
         f (MouseEvent 1 ButtonDown (Coords mx _my)) (s, _, _) =
-            let i' = fromMaybe (Text.length s) $ findIndex (floor (mx - x0) <=) ws''
+            let i' = fromMaybe (Text.length s) $ findIndex (>= floor (mx - x0)) ws''
             in (s, i', i')
         f _ x = x
 
-textfield' :: Widget' t (Maybe Text) Text
-textfield' =
-    proc ev ->
-  textfield -< stdTextfieldConfig{textfieldConfigTextUpdate = ev}
+textfield' :: Text -> Widget' t (Maybe Text) Text
+textfield' t = proc ev ->
+  textfield -< stdTextfieldConfig{ textfieldConfigTextUpdate = ev,
+                                   textfieldConfigText = t }

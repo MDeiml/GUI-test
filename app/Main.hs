@@ -7,6 +7,7 @@ import           Control.Arrow
 import qualified Data.Text     as Text
 import           Lib
 import           SDLRenderer
+import           Text.Read     (readMaybe)
 
 test1 :: App t
 test1 =
@@ -68,32 +69,26 @@ test4 =
 test5 :: App t
 test5 =
     stackLayout (0, 0, 0, 0) (AlignCenter, AlignCenter) (Just 1, Just 1) $
-    proc _ ->
-  do a -< ()
+    proc _ -> do
+     () >- linearLayout Vertical (Nothing, Nothing) $
+           proc _ -> do
+              n <- evLast 5 <<< inp -< ()
+              label' -< Text.pack $ show n
      background (Color 255 255 0) -< ()
   where
     inp =
         linearLayout Horizontal (Nothing, Nothing) $
         proc _ -> do
-     i1 <- textfield -< stdTextfieldConfig { textfieldConfigText = "2" }
+     i1 <- textfield' "2" -< Nothing
      label' -< "+"
-     i2 <- textfield -< stdTextfieldConfig { textfieldConfigText = "3" }
-     let i1' = case reads $ Text.unpack i1 of
-                 [(x, _)] -> Just x
-                 _        -> Nothing
-     let i2' = case reads $ Text.unpack i2 of
-                 [(x, _)] -> Just x
-                 _        -> Nothing
+     i2 <- textfield' "3" -< Nothing
+     let i1' = readMaybe $ Text.unpack i1
+         i2' = readMaybe $ Text.unpack i2
      returnA -< (+) <$> i1' <*> (i2' :: Maybe Integer)
-    a =
-        linearLayout Vertical (Nothing, Nothing) $
-        proc _ -> do
-     n <- evLast 5 <<< inp -< ()
-     label' -< Text.pack $ show n
 
 test :: IO ()
 test = do
     r <- create "Test" (800, 600) :: IO SDLRenderer
-    mainLoop r 2 test5
+    mainLoop r 2 test3
 
 main = test
