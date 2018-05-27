@@ -9,8 +9,8 @@ module Types
 type Weight = Maybe Float
 
 data LayoutParam = LayoutParam
-    { pWidth :: Float
-    , pHeight :: Float
+    { pWidth   :: Float
+    , pHeight  :: Float
     , pWeightX :: Weight
     , pWeightY :: Weight
     } deriving (Show, Eq)

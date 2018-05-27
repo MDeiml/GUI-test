@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types    #-}
+{-# LANGUAGE RecursiveDo   #-}
 
 module GUI
     ( Globals(..)
@@ -22,11 +22,11 @@ module GUI
     , runGUI
     ) where
 
-import Control.Monad.Fix
-import Drawable
-import Resources
-import Types
-import Control.Monad.IO.Class
+import           Control.Monad.Fix
+import           Control.Monad.IO.Class
+import           Drawable
+import           Resources
+import           Types
 
 data Cmd t
     = Render (Drawable t)
@@ -35,8 +35,8 @@ data Cmd t
     | StopTextInput
 
 data Globals t = Globals
-    { gEvents :: [Event]
-    , gTime :: Integer
+    { gEvents    :: [Event]
+    , gTime      :: Integer
     , gResources :: forall a. ResourceId a -> IO (Either String (a t))
     }
 
@@ -57,8 +57,8 @@ type Key = Int
 
 data Modifiers = Modifiers
     { mShift :: Bool
-    , mCtrl :: Bool
-    , mAlt :: Bool
+    , mCtrl  :: Bool
+    , mAlt   :: Bool
     } deriving (Show, Eq)
 
 data Event
@@ -94,13 +94,13 @@ instance Monad (GUI t) where
 
 instance MonadFix (GUI t) where
     mfix f =
-        GUI $ \g -> mdo
-            let (GUI a) = f a'
-            ~(a', ca) <- a g
-            return (a', ca)
+        GUI $ \g ->
+            mdo let (GUI a) = f a'
+                ~(a', ca) <- a g
+                return (a', ca)
 
 instance MonadIO (GUI t) where
-    liftIO m = GUI $ const $ fmap (\x -> (x,[])) m
+    liftIO m = GUI $ const $ fmap (\x -> (x, [])) m
 
 guiEvents :: GUI t [Event]
 guiEvents = GUI $ \g -> return (gEvents g, [])

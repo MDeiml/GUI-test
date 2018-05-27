@@ -9,11 +9,11 @@ module Lib
     , module Resources
     ) where
 
-import Components
-import Drawable
-import Input
-import Layout
-import Renderer
-import Types
-import Widget
-import Resources
+import           Components
+import           Drawable
+import           Input
+import           Layout
+import           Renderer
+import           Resources
+import           Types
+import           Widget

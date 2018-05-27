@@ -1,6 +1,6 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE GADTs              #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module Resources
     ( ResourceId(..)
@@ -13,8 +13,8 @@ module Resources
     , resEmpty
     ) where
 
-import qualified Data.Map as M
-import Data.Monoid
+import qualified Data.Map    as M
+import           Data.Monoid
 
 data Sprite t =
     Sprite t
@@ -23,12 +23,12 @@ data Sprite t =
     deriving (Show, Eq)
 
 data Font t = Font
-    { glyphs :: Integer -> t
+    { glyphs      :: Integer -> t
     , fontMetrics :: Integer -> (Int, Int, Int, Int, Int)
-    , ascent :: Int
-    , descent :: Int
-    , fontname :: String
-    , fontsize :: Int
+    , ascent      :: Int
+    , descent     :: Int
+    , fontname    :: String
+    , fontsize    :: Int
     }
 
 data NinePatch t =
@@ -57,8 +57,8 @@ instance Ord (ResourceId NinePatch) where
 type ResourceMap a t = M.Map (ResourceId a) (a t)
 
 data Resources t = Resources
-    { resourceFonts :: ResourceMap Font t
-    , resourceSprites :: ResourceMap Sprite t
+    { resourceFonts       :: ResourceMap Font t
+    , resourceSprites     :: ResourceMap Sprite t
     , resourceNinePatches :: ResourceMap NinePatch t
     }
 
@@ -66,8 +66,8 @@ resEmpty = Resources M.empty M.empty M.empty
 
 resLookup :: ResourceId a -> Resources t -> Maybe (a t)
 resLookup i@(ResF _ _) = M.lookup i . resourceFonts
-resLookup i@(ResS _) = M.lookup i . resourceSprites
-resLookup i@(ResN _) = M.lookup i . resourceNinePatches
+resLookup i@(ResS _)   = M.lookup i . resourceSprites
+resLookup i@(ResN _)   = M.lookup i . resourceNinePatches
 
 resInsert :: ResourceId a -> a t -> Resources t -> Resources t
 resInsert i@(ResF _ _) r res =

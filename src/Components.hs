@@ -9,14 +9,14 @@ module Components
     , module Textcomponent
     ) where
 
-import Control.Arrow
-import Data.Maybe
-import Drawable
-import Input
-import Layout
-import Resources
-import Textcomponent
-import Widget
+import           Control.Arrow
+import           Data.Maybe
+import           Drawable
+import           Input
+import           Layout
+import           Resources
+import           Textcomponent
+import           Widget
 
 background :: Color -> Widget' t () ()
 background c =

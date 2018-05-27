@@ -1,5 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types                #-}
 
 module Input
     ( mouseListener
@@ -14,15 +14,15 @@ module Input
     , Widget'
     ) where
 
-import Control.Arrow
-import Control.Monad
-import Data.Maybe (mapMaybe)
-import Drawable
-import GUI
-import Layout
-import Resources
-import Types
-import Widget
+import           Control.Arrow
+import           Control.Monad
+import           Data.Maybe    (mapMaybe)
+import           Drawable
+import           GUI
+import           Layout
+import           Resources
+import           Types
+import           Widget
 
 type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
 
@@ -42,8 +42,7 @@ time :: Widget' t () Integer
 time = buildWidgetStatic' $ const guiTime
 
 widgetOutput :: Widget' t ((LayoutParam, Bool), Bounds -> [Drawable t]) ()
-widgetOutput =
-    buildWidgetStatic $ \(p, r) -> return ((), p, \bs -> do guiDraw $ r bs)
+widgetOutput = buildWidgetStatic $ \(p, r) -> return ((), p, guiDraw . r)
 
 widgetOutput' :: Widget' t [Drawable t] ()
 widgetOutput' =
@@ -81,4 +80,4 @@ focusListener = buildWidget $ runWidget' False (Bounds 0 0 0 0)
     f' bs e focus' =
         case e of
             MouseEvent _but ButtonDown coords -> coords `inside` bs
-            _ -> focus'
+            _                                 -> focus'

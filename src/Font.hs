@@ -231,7 +231,9 @@ getFontPath fontname bold italic = do
         paths = map head tokens''
     return (head paths)
   where
-      split c s = case elemIndex c s of
-                    Nothing -> [s]
-                    Just i -> let (a, b) = splitAt i s
-                               in a : split c (tail b)
+    split c s =
+        case elemIndex c s of
+            Nothing -> [s]
+            Just i ->
+                let (a, b) = splitAt i s
+                in a : split c (tail b)

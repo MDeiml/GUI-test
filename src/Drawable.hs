@@ -4,9 +4,9 @@ module Drawable
     , Shape(..)
     ) where
 
-import Data.Word (Word8)
-import Resources
-import Types
+import           Data.Word (Word8)
+import           Resources
+import           Types
 
 data Drawable t
     = DrawShape Color

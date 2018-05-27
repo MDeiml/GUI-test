@@ -1,5 +1,5 @@
 {-# LANGUAGE Arrows #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs  #-}
 
 module Textcomponent
     ( textfield
@@ -13,20 +13,20 @@ module Textcomponent
     , stdTextfieldConfig
     ) where
 
-import Control.Applicative
-import Control.Arrow
-import Control.Monad
-import Data.List (findIndex)
-import Data.Maybe
-import Drawable
-import GUI
-import Input
-import Layout
-import Resources
-import SDL.Input.Keyboard.Codes
-import SDL.Internal.Numbered (toNumber)
-import Types
-import Widget
+import           Control.Applicative
+import           Control.Arrow
+import           Control.Monad
+import           Data.List                (findIndex)
+import           Data.Maybe
+import           Drawable
+import           GUI
+import           Input
+import           Layout
+import           Resources
+import           SDL.Input.Keyboard.Codes
+import           SDL.Internal.Numbered    (toNumber)
+import           Types
+import           Widget
 
 type TextInputState = (String, Int, Int)
 
@@ -63,9 +63,9 @@ textInputIO =
         return (f, ())
 
 data LabelConfig = LabelConfig
-    { labelConfigFont :: ResourceId Font
+    { labelConfigFont  :: ResourceId Font
     , labelConfigColor :: Color
-    , labelConfigText :: String
+    , labelConfigText  :: String
     }
 
 stdLabelConfig :: LabelConfig
@@ -107,12 +107,12 @@ label' :: Widget' t String ()
 label' = proc s -> label -< stdLabelConfig{labelConfigText = s}
 
 data TextfieldConfig = TextfieldConfig
-    { textfieldConfigText :: String
-    , textfieldConfigTextUpdate :: Maybe String
+    { textfieldConfigText        :: String
+    , textfieldConfigTextUpdate  :: Maybe String
     , textfieldConfigLayoutParam :: LayoutParam
-    , textfieldConfigFont :: ResourceId Font
-    , textfieldConfigNinepatch :: ResourceId NinePatch
-    , textfieldConfigTextColor :: Color
+    , textfieldConfigFont        :: ResourceId Font
+    , textfieldConfigNinepatch   :: ResourceId NinePatch
+    , textfieldConfigTextColor   :: Color
     , textfieldConfigSelectColor :: Color
     }
 
@@ -130,8 +130,8 @@ stdTextfieldConfig =
 
 textfield :: Widget' t TextfieldConfig String
 textfield =
-    proc config ->
-  do let p = textfieldConfigLayoutParam config
+    proc config -> do
+     let p = textfieldConfigLayoutParam config
      stackLayout' w -<
        (config,
         ((0, 0, 0, 0), (AlignStart, AlignCenter),

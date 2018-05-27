@@ -1,39 +1,39 @@
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
 
 module SDLRenderer
     ( SDLRenderer
     ) where
 
-import qualified Codec.Picture as P
-import Control.Monad
-import Control.Monad.Trans.Maybe
-import qualified Data.ByteString as BS
-import Data.IORef
-import Data.Maybe (maybeToList)
-import qualified Data.Text as T
-import Data.Vector.Storable (unsafeWith)
-import Data.Word
-import Drawable
-import Font
-import GUI
+import qualified Codec.Picture             as P
+import           Control.Monad
+import           Control.Monad.Trans.Maybe
+import qualified Data.ByteString           as BS
+import           Data.IORef
+import           Data.Maybe                (maybeToList)
+import qualified Data.Text                 as T
+import           Data.Vector.Storable      (unsafeWith)
+import           Data.Word
+import           Drawable
+import           Font
+import           Graphics.Rendering.OpenGL (($=))
 import qualified Graphics.Rendering.OpenGL as GL
-import Graphics.Rendering.OpenGL (($=))
-import Renderer
-import Resources
-import qualified SDL as S
-import SDL.Internal.Numbered (toNumber)
-import qualified SDL.Raw.Types as SR
-import Texture
-import Types
+import           GUI
+import           Renderer
+import           Resources
+import qualified SDL                       as S
+import           SDL.Internal.Numbered     (toNumber)
+import qualified SDL.Raw.Types             as SR
+import           Texture
+import           Types
 
 data SDLRenderer = SDLRenderer
-    { window :: S.Window
-    , context :: S.GLContext
-    , closed :: IORef Bool
+    { window        :: S.Window
+    , context       :: S.GLContext
+    , closed        :: IORef Bool
     , defaultShader :: GL.Program
-    , fontShader :: GL.Program
+    , fontShader    :: GL.Program
     }
 
 color :: Word8 -> Word8 -> Word8 -> IO ()
@@ -163,7 +163,7 @@ instance Renderer SDLRenderer Texture where
                         b = fromIntegral $ toNumber $ S.mouseButtonEventButton d
                         bs =
                             case S.mouseButtonEventMotion d of
-                                S.Pressed -> ButtonDown
+                                S.Pressed  -> ButtonDown
                                 S.Released -> ButtonUp
                     in return
                            [ MouseEvent

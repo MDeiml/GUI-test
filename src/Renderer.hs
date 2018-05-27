@@ -1,7 +1,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase             #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE Rank2Types             #-}
 
 module Renderer
     ( mainLoop
@@ -11,20 +11,20 @@ module Renderer
     , App
     ) where
 
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
-import Data.Aeson
-import Data.Aeson.Types
-import qualified Data.ByteString.Lazy as BS
-import Data.IORef
-import Data.Time.Clock.POSIX (getPOSIXTime)
-import Drawable
-import GUI
-import Input
-import Resources
-import Types
-import Widget
+import           Control.Monad
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Maybe
+import           Data.Aeson
+import           Data.Aeson.Types
+import qualified Data.ByteString.Lazy      as BS
+import           Data.IORef
+import           Data.Time.Clock.POSIX     (getPOSIXTime)
+import           Drawable
+import           GUI
+import           Input
+import           Resources
+import           Types
+import           Widget
 
 type App t = Widget' t () ()
 

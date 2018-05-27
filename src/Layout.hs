@@ -1,5 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types                #-}
 
 module Layout
     ( LayoutParam(..)
@@ -21,11 +21,11 @@ module Layout
     , constLayout'
     ) where
 
-import Control.Monad.Fix
-import Data.List (transpose)
-import Data.Maybe (mapMaybe)
-import Types
-import Widget
+import           Control.Monad.Fix
+import           Data.List         (transpose)
+import           Data.Maybe        (mapMaybe)
+import           Types
+import           Widget
 
 type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
@@ -144,27 +144,29 @@ stackLayout1 (mt, mb, mr, ml) (ax, ay) (lx, ly) ps =
         width =
             case pWeightX p of
                 Nothing -> pWidth p
-                Just 0 -> case pWeightX (head ps) of
-                            Nothing -> pWidth (head ps)
-                            Just _ -> x1 - x0
+                Just 0 ->
+                    case pWeightX (head ps) of
+                        Nothing -> pWidth (head ps)
+                        Just _  -> x1 - x0
                 Just _ -> x1 - x0
         height =
             case pWeightY p of
                 Nothing -> pHeight p
-                Just 0 -> case pWeightY (head ps) of
-                            Nothing -> pHeight (head ps)
-                            Just _ -> y1 - y0
+                Just 0 ->
+                    case pWeightY (head ps) of
+                        Nothing -> pHeight (head ps)
+                        Just _  -> y1 - y0
                 Just _ -> y1 - y0
         xs =
             case ax of
-                AlignStart -> 0
+                AlignStart  -> 0
                 AlignCenter -> ((x1 - x0) - width) / 2
-                AlignEnd -> (x1 - x0) - width
+                AlignEnd    -> (x1 - x0) - width
         ys =
             case ay of
-                AlignStart -> 0
+                AlignStart  -> 0
                 AlignCenter -> ((y1 - y0) - height) / 2
-                AlignEnd -> (y1 - y0) - height
+                AlignEnd    -> (y1 - y0) - height
 
 linearLayout ::
        Orientation -> (Weight, Weight) -> Layout LayoutParam LayoutParam
@@ -186,16 +188,16 @@ linearLayout1 o (lx, ly) ps = (calcBounds, param)
         {pWidth = pWidth', pHeight = pHeight', pWeightX = lx, pWeightY = ly}
     pWidth' =
         case o of
-            Vertical -> maximum $ map pWidth ps
+            Vertical   -> maximum $ map pWidth ps
             Horizontal -> totalX
     pHeight' =
         case o of
             Horizontal -> maximum $ map pHeight ps
-            Vertical -> totalY
+            Vertical   -> totalY
     calcBounds (Bounds x0 y0 x1 y1) =
         case o of
             Horizontal -> stackH x0 $ map calcBoundsH ps
-            Vertical -> stackV y0 $ map calcBoundsV ps
+            Vertical   -> stackV y0 $ map calcBoundsV ps
       where
         restX = (x1 - x0) - totalX
         restY = (y1 - y0) - totalY
@@ -266,11 +268,11 @@ tableLayout1 colwidth (lx, ly) ps = (calcBounds, param)
         fx w p =
             case pWeightX p of
                 Nothing -> pWidth p
-                Just _ -> w
+                Just _  -> w
         fy h p =
             case pWeightY p of
                 Nothing -> pHeight p
-                Just _ -> h
+                Just _  -> h
         bounds = zipWith (zipWith (Bounds 0 0)) widths heights
         bounds' =
             transpose $
