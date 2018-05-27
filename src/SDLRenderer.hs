@@ -12,7 +12,7 @@ import           Control.Monad.Trans.Maybe
 import qualified Data.ByteString           as BS
 import           Data.IORef
 import           Data.Maybe                (maybeToList)
-import qualified Data.Text                 as T
+import qualified Data.Text                 as Text
 import           Data.Vector.Storable      (unsafeWith)
 import           Data.Word
 import           Drawable
@@ -55,6 +55,17 @@ texCoord x y =
     GL.texCoord
         (GL.TexCoord2 (realToFrac x) (realToFrac y) :: GL.TexCoord2 GL.GLdouble)
 
+drawRect :: Bounds -> Bounds -> IO ()
+drawRect (Bounds u0 v0 u1 v1) (Bounds x0 y0 x1 y1) = do
+    texCoord u0 v0
+    vertex x0 y0
+    texCoord u1 v0
+    vertex x1 y0
+    texCoord u1 v1
+    vertex x1 y1
+    texCoord u0 v1
+    vertex x0 y1
+
 loadShader :: FilePath -> GL.ShaderType -> IO (Either String GL.Shader)
 loadShader fp st = do
     shader <- GL.createShader st
@@ -92,7 +103,7 @@ instance Renderer SDLRenderer Texture where
         S.initializeAll
         win <-
             S.createWindow
-                (T.pack title)
+                title
                 S.defaultWindow
                 { S.windowInitialSize = S.V2 (fromIntegral w) (fromIntegral h)
                 , S.windowOpenGL = Just S.defaultOpenGL
@@ -151,7 +162,7 @@ instance Renderer SDLRenderer Texture where
                     in return [KeyEvent mod' kc ks]
                 S.TextEditingEvent _ -> return []
                 S.TextInputEvent d ->
-                    return [TextEvent $ T.unpack $ S.textInputEventText d]
+                    return [TextEvent $ S.textInputEventText d]
                 S.MouseMotionEvent d ->
                     let (S.P (S.V2 x y)) = S.mouseMotionEventPos d
                     in return
@@ -196,20 +207,16 @@ instance Renderer SDLRenderer Texture where
             color r g b
             vertex x0 y0
             vertex x1 y1
-    render re (Image (Texture (tex, u0, v0, u1, v1)) (Bounds x0 y0 x1 y1)) = do
+    render re (Image (Texture tex texCoords) bs) = do
         renderInit re $ defaultShader re
         GL.textureBinding GL.Texture2D $= Just tex
         GL.renderPrimitive GL.Quads $ do
             color 0 0 0
-            texCoord u0 v0
-            vertex x0 y0
-            texCoord u1 v0
-            vertex x1 y0
-            texCoord u1 v1
-            vertex x1 y1
-            texCoord u0 v1
-            vertex x0 y1
-    render re (NinePatch (NP (Sprite (Texture (tex, u0, v0, u1, v1)) _ _) (us', vs', ue', ve')) (Bounds x0 y0 x1 y1) (Bounds xs ys xe ye)) = do
+            drawRect texCoords bs
+    render re (NinePatch (NP (Sprite (Texture tex texCoords) _ _) (us', vs', ue', ve')) bs bss) = do
+        let Bounds u0 v0 u1 v1 = texCoords
+            Bounds x0 y0 x1 y1 = bs
+            Bounds xs ys xe ye = bss
         renderInit re $ defaultShader re
         GL.textureBinding GL.Texture2D $= Just tex
         let w = u1 - u0
@@ -220,83 +227,20 @@ instance Renderer SDLRenderer Texture where
             ve = v0 + ve' * h
         GL.renderPrimitive GL.Quads $ do
             color 0 0 0
-            texCoord u0 v0 -- Left Bottom
-            vertex x0 y0
-            texCoord us v0
-            vertex xs y0
-            texCoord us vs
-            vertex xs ys
-            texCoord u0 vs
-            vertex x0 ys
-            texCoord us v0 -- Bottom
-            vertex xs y0
-            texCoord ue v0
-            vertex xe y0
-            texCoord ue vs
-            vertex xe ys
-            texCoord us vs
-            vertex xs ys
-            texCoord ue v0 -- Bottom Right
-            vertex xe y0
-            texCoord u1 v0
-            vertex x1 y0
-            texCoord u1 vs
-            vertex x1 ys
-            texCoord ue vs
-            vertex xe ys
-            texCoord u0 vs -- Left
-            vertex x0 ys
-            texCoord us vs
-            vertex xs ys
-            texCoord us ve
-            vertex xs ye
-            texCoord u0 ve
-            vertex x0 ye
-            texCoord us vs -- Center
-            vertex xs ys
-            texCoord ue vs
-            vertex xe ys
-            texCoord ue ve
-            vertex xe ye
-            texCoord us ve
-            vertex xs ye
-            texCoord ue vs -- Right
-            vertex xe ys
-            texCoord u1 vs
-            vertex x1 ys
-            texCoord u1 ve
-            vertex x1 ye
-            texCoord ue ve
-            vertex xe ye
-            texCoord u0 ve -- Left Top
-            vertex x0 ye
-            texCoord us ve
-            vertex xs ye
-            texCoord us v1
-            vertex xs y1
-            texCoord u0 v1
-            vertex x0 y1
-            texCoord us ve -- Top
-            vertex xs ye
-            texCoord ue ve
-            vertex xe ye
-            texCoord ue v1
-            vertex xe y1
-            texCoord us v1
-            vertex xs y1
-            texCoord ue ve -- Top Right
-            vertex xe ye
-            texCoord u1 ve
-            vertex x1 ye
-            texCoord u1 v1
-            vertex x1 y1
-            texCoord ue v1
-            vertex xe y1
-    render re (DrawShape (Color r g b) (Text text (Coords x y) f)) =
-        unless (null text) $ do
+            drawRect (Bounds u0 v0 us vs) (Bounds x0 y0 xs ys) -- Bottom Left
+            drawRect (Bounds us v0 ue vs) (Bounds xs y0 xe ys) -- Bottom
+            drawRect (Bounds ue v0 u1 vs) (Bounds xe y0 x1 ys) -- Bottom Right
+            drawRect (Bounds u0 vs us ve) (Bounds x0 ys xs ye) -- Left
+            drawRect (Bounds us vs ue ve) (Bounds xs ys xe ye) -- Center
+            drawRect (Bounds ue vs u1 ve) (Bounds xe ys x1 ye) -- Right
+            drawRect (Bounds u0 ve us v1) (Bounds x0 ye xs y1) -- Top Left
+            drawRect (Bounds us ve ue v1) (Bounds xs ye xe y1) -- Top Center
+            drawRect (Bounds ue ve u1 v1) (Bounds xe ye x1 y1) -- Top Right
+    render re (DrawShape (Color r g b) (DrawText text (Coords x y) f)) =
+        unless (Text.null text) $ do
             renderInit re (fontShader re)
-            let Texture (tex, _, _, _, _) =
-                    glyphs f $ fromIntegral $ fromEnum $ head text
+            let Texture tex _ =
+                    glyphs f $ fromIntegral $ fromEnum $ Text.head text
             GL.textureBinding GL.Texture2D $= Just tex
             GL.renderPrimitive GL.Quads $ do
                 color r g b
@@ -313,7 +257,8 @@ instance Renderer SDLRenderer Texture where
                                                   0.2)))
                              else do
                                  let c' = fromIntegral $ fromEnum c
-                                     Texture (_, x0, y0, x1, y1) = glyphs f c'
+                                     Texture _ (Bounds x0 y0 x1 y1) =
+                                         glyphs f c'
                                      fi = fromIntegral
                                      (w, h, bx, by, a) =
                                          let (a1, a2, a3, a4, a5) =
@@ -333,8 +278,8 @@ instance Renderer SDLRenderer Texture where
                                  texCoord x0 y1
                                  vertex x'' (y'' + h)
                                  return (x' + a, y'))
-                    (x, y)
-                    text
+                    (x, y) $
+                    Text.unpack text
     loadResource re (ResF size fontname) = do
         S.glMakeCurrent (window re) (context re)
         path <- getFontPath fontname False False
@@ -372,4 +317,4 @@ instance Renderer SDLRenderer Texture where
                     (GL.Repeated, GL.ClampToEdge)
                 GL.textureWrapMode GL.Texture2D GL.T $=
                     (GL.Repeated, GL.ClampToEdge)
-                return $ Right $ Sprite (Texture (tex, 0, 0, 1, 1)) w h
+                return $ Right $ Sprite (Texture tex (Bounds 0 0 1 1)) w h

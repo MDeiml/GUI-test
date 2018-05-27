@@ -18,6 +18,7 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy      as BS
 import           Data.IORef
+import           Data.Text                 (Text)
 import           Data.Time.Clock.POSIX     (getPOSIXTime)
 import           Drawable
 import           GUI
@@ -109,7 +110,7 @@ loadNinpatch r fp = do
     return $ NP tex (f xs / f w, f ys / f h, f xe / f w, f ye / f h)
 
 class Renderer r t | r -> t where
-    create :: String -> (Int, Int) -> IO r
+    create :: Text -> (Int, Int) -> IO r
     render :: r -> Drawable t -> IO ()
     clear :: r -> IO ()
     swapBuffers :: r -> IO ()

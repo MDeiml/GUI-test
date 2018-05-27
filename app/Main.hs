@@ -1,10 +1,12 @@
-{-# LANGUAGE Arrows #-}
+{-# LANGUAGE Arrows            #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
-import Control.Arrow
-import Lib
-import SDLRenderer
+import           Control.Arrow
+import qualified Data.Text     as Text
+import           Lib
+import           SDLRenderer
 
 test1 :: App t
 test1 =
@@ -57,9 +59,8 @@ test4 =
      t0 <- initial -< t
      let secs = (t - t0) `quot` 1000
      label -<
-       stdLabelConfig{labelConfigFont =
-                        ResF 60 "Ubuntu",
-                      labelConfigText = show secs}
+       stdLabelConfig{labelConfigFont = ResF 60 "Ubuntu",
+                      labelConfigText = Text.pack $ show secs}
      widgetOutput -<
        ((stdParams, False), (: []) . DrawShape (Color 255 0 0) . Rect)
      background (Color 255 255 255) -< ()
@@ -77,20 +78,18 @@ test5 =
      i1 <- textfield -< stdTextfieldConfig { textfieldConfigText = "2" }
      label' -< "+"
      i2 <- textfield -< stdTextfieldConfig { textfieldConfigText = "3" }
-     let i1'
-           = case reads i1 of
+     let i1' = case reads $ Text.unpack i1 of
                  [(x, _)] -> Just x
-                 _ -> Nothing
-     let i2'
-           = case reads i2 of
+                 _        -> Nothing
+     let i2' = case reads $ Text.unpack i2 of
                  [(x, _)] -> Just x
-                 _ -> Nothing
+                 _        -> Nothing
      returnA -< (+) <$> i1' <*> (i2' :: Maybe Integer)
     a =
         linearLayout Vertical (Nothing, Nothing) $
         proc _ -> do
      n <- evLast 5 <<< inp -< ()
-     label' -< show n
+     label' -< Text.pack $ show n
 
 test :: IO ()
 test = do

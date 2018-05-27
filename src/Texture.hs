@@ -3,6 +3,7 @@ module Texture
     ) where
 
 import qualified Graphics.Rendering.OpenGL as GL
+import Types
 
-newtype Texture =
-    Texture (GL.TextureObject, Float, Float, Float, Float)
+data Texture =
+    Texture GL.TextureObject Bounds

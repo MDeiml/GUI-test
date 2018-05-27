@@ -4,6 +4,7 @@ module Drawable
     , Shape(..)
     ) where
 
+import           Data.Text (Text)
 import           Data.Word (Word8)
 import           Resources
 import           Types
@@ -28,7 +29,7 @@ data Shape t
     = Rect Bounds
     | Line Coords
            Coords
-    | Text String
-           Coords
-           (Font t)
+    | DrawText Text
+               Coords
+               (Font t)
     deriving (Show, Eq)

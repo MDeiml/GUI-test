@@ -24,6 +24,7 @@ module GUI
 
 import           Control.Monad.Fix
 import           Control.Monad.IO.Class
+import           Data.Text              (Text)
 import           Drawable
 import           Resources
 import           Types
@@ -65,7 +66,7 @@ data Event
     = KeyEvent Modifiers
                Key
                KeyState
-    | TextEvent String
+    | TextEvent Text
     | MouseEvent MouseButton
                  ButtonState
                  Coords

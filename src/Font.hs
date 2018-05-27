@@ -3,35 +3,36 @@ module Font
     , getFontPath
     ) where
 
-import Control.Monad
-import Data.ByteArray (withByteArray)
-import qualified Data.ByteString as BS
-import Data.List (elemIndex, sortOn)
-import Data.Maybe
-import Foreign
-import Foreign.C.String
-import Graphics.Rendering.FreeType.Internal
-import Graphics.Rendering.FreeType.Internal.Bitmap
-import Graphics.Rendering.FreeType.Internal.Face
-import qualified Graphics.Rendering.FreeType.Internal.GlyphMetrics
-       as GM
-import Graphics.Rendering.FreeType.Internal.GlyphSlot
-import Graphics.Rendering.FreeType.Internal.Library
-import Graphics.Rendering.FreeType.Internal.PrimitiveTypes
-import qualified Graphics.Rendering.OpenGL as GL
-import Graphics.Rendering.OpenGL (($=))
-import Resources
-import System.IO.Unsafe
-import System.Process
-import Texture
+import           Control.Monad
+import           Data.ByteArray                                      (withByteArray)
+import qualified Data.ByteString                                     as BS
+import           Data.List                                           (elemIndex,
+                                                                      sortOn)
+import           Data.Maybe
+import           Foreign
+import           Foreign.C.String
+import           Graphics.Rendering.FreeType.Internal
+import           Graphics.Rendering.FreeType.Internal.Bitmap
+import           Graphics.Rendering.FreeType.Internal.Face
+import qualified Graphics.Rendering.FreeType.Internal.GlyphMetrics   as GM
+import           Graphics.Rendering.FreeType.Internal.GlyphSlot
+import           Graphics.Rendering.FreeType.Internal.Library
+import           Graphics.Rendering.FreeType.Internal.PrimitiveTypes
+import           Graphics.Rendering.OpenGL                           (($=))
+import qualified Graphics.Rendering.OpenGL                           as GL
+import           Resources
+import           System.IO.Unsafe
+import           System.Process
+import           Texture
+import           Types
 
 data Glyph = Glyph
-    { gBitmap :: [Word8]
-    , gWidth :: Int
-    , gHeight :: Int
+    { gBitmap   :: [Word8]
+    , gWidth    :: Int
+    , gHeight   :: Int
     , gBearingX :: Int
     , gBearingY :: Int
-    , gAdvance :: Int
+    , gAdvance  :: Int
     , gCharcode :: Integer
     }
 
@@ -165,7 +166,7 @@ generateAtlas fp px = do
         Font
         { glyphs =
               (\(x, y, w, h, _, _, _) ->
-                   Texture (tex, f x, f y, f $ x + w, f $ y + h)) .
+                   Texture tex (Bounds (f x) (f y) (f $ x + w) (f $ y + h))) .
               lu
         , fontMetrics = (\(_, _, w, h, x, y, a) -> (w, h, x, y, a)) . lu
         , ascent = (fromIntegral asc * px) `quot` fromIntegral u
