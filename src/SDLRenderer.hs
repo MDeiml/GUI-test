@@ -188,6 +188,9 @@ instance Renderer SDLRenderer Texture where
     getSize r = do
         (S.V2 w h) <- S.glGetDrawableSize $ window r
         return (fromIntegral w, fromIntegral h)
+    setSize r (w, h) = do
+        S.windowSize (window r) $= S.V2 (fromIntegral w) (fromIntegral h)
+        GL.viewport $= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
     closing r = readIORef $ closed r
     startTextInput _ = S.startTextInput (SR.Rect 0 0 0 0)
     stopTextInput _ = S.stopTextInput

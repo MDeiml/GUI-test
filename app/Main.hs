@@ -88,7 +88,9 @@ test5 =
 
 test :: IO ()
 test = do
-    r <- create "Test" (800, 600) :: IO SDLRenderer
-    mainLoop r 2 test3
+    r <- create "Test" (400, 300) :: IO SDLRenderer
+    st <- initState test5
+    st' <- packWindow r st
+    mainLoop r 2 st'
 
 main = test

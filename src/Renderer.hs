@@ -6,7 +6,11 @@
 module Renderer
     ( mainLoop
     , loadNinpatch
+    , initState
+    , renderStep
+    , packWindow
     , Renderer(..)
+    , RendererState
     , Globals(..)
     , App
     ) where
@@ -29,6 +33,15 @@ import           Widget
 
 type App t = Widget' t () ()
 
+data RendererState t =
+    RendererState (IORef (Resources t))
+                  (App t)
+
+initState :: App t -> IO (RendererState t)
+initState app = do
+    res <- newIORef resEmpty
+    return $ RendererState res app
+
 loadResource' ::
        (Renderer r t)
     => r
@@ -47,49 +60,68 @@ loadResource' r ress i = do
                     writeIORef ress $ resInsert i res' ress'
                     return res
 
-mainLoop :: (Renderer r t) => r -> Int -> App t -> IO ()
-mainLoop r fps w0 = do
-    res <- newIORef resEmpty
-    mainLoop' w0 res
+mainLoop :: (Renderer r t) => r -> Int -> RendererState t -> IO ()
+mainLoop r fps st = do
+    st' <- fst <$> renderStep' frameTime r st
+    c <- closing r
+    unless c $ mainLoop r fps st'
   where
     frameTime = 1 / fromIntegral fps
-    mainLoop' w res = do
-        events <- waitEvents r frameTime
-        (width, height) <- getSize r
-        clear r
-        now <- getPOSIXTime
-        let glob =
-                Globals
-                { gEvents = events
-                , gTime = round $ now * 1000
-                , gResources = loadResource' r res
-                }
-            gui = runGUI $ runWidget w ()
-        ~(~(_, _, ds'), ds) <- gui glob
-        ~(w', ds'') <- runGUI (ds' [Bounds 0 0 width height]) glob
-        mapM_
-            (\case
-                 Render d -> render r d
-                 RunIO m -> m
-                 _ -> return ()) $
-            reverse ds ++ reverse ds''
-        when
-            (any
-                 (\case
-                      StopTextInput -> True
-                      _ -> False)
-                 ds) $
-            stopTextInput r
-        when
-            (any
-                 (\case
-                      StartTextInput -> True
-                      _ -> False)
-                 ds) $
-            startTextInput r
-        swapBuffers r
-        c <- closing r
-        unless c $ mainLoop' w' res
+
+renderStep :: (Renderer r t) => r -> RendererState t -> IO (RendererState t)
+renderStep r st = fst <$> renderStep' 0 r st
+
+packWindow :: (Renderer r t) => r -> RendererState t -> IO (RendererState t)
+packWindow r st = do
+    (st', p) <- renderStep' 0 r st
+    let size = (ceiling $ pWidth p, ceiling $ pHeight p)
+    setSize r size
+    return st'
+
+renderStep' ::
+       (Renderer r t)
+    => Double
+    -> r
+    -> RendererState t
+    -> IO (RendererState t, LayoutParam)
+renderStep' frameTime r (RendererState res w) = do
+    events <- waitEvents r frameTime
+    (width, height) <- getSize r
+    let bs = Bounds 0 0 (fromIntegral width) (fromIntegral height)
+    clear r
+    now <- getPOSIXTime
+    let glob =
+            Globals
+            { gEvents = events
+            , gTime = round $ now * 1000
+            , gResources = loadResource' r res
+            }
+        gui = runGUI $ runWidget w ()
+    ~(~(_, p, ds'), ds) <- gui glob
+    ~(w', ds'') <-
+        runGUI
+            (ds' [bs])
+            glob
+    forM_ (reverse ds ++ reverse ds'') $ \case
+        Render d -> render r d
+        RunIO m -> m
+        _ -> return ()
+    when
+        (any
+             (\case
+                  StopTextInput -> True
+                  _ -> False)
+             ds) $
+        stopTextInput r
+    when
+        (any
+             (\case
+                  StartTextInput -> True
+                  _ -> False)
+             ds) $
+        startTextInput r
+    swapBuffers r
+    return (RendererState res w', fst $ head p)
 
 loadNinpatch :: Renderer r t => r -> FilePath -> MaybeT IO (NinePatch t)
 loadNinpatch r fp = do
@@ -114,7 +146,8 @@ class Renderer r t | r -> t where
     render :: r -> Drawable t -> IO ()
     clear :: r -> IO ()
     swapBuffers :: r -> IO ()
-    getSize :: r -> IO (Float, Float)
+    getSize :: r -> IO (Int, Int)
+    setSize :: r -> (Int, Int) -> IO ()
     closing :: r -> IO Bool
     waitEvents :: r -> Double -> IO [Event]
     loadResource :: r -> ResourceId a -> IO (Either String (a t))
