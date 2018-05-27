@@ -21,20 +21,20 @@ module Layout
     , constLayout'
     ) where
 
-import           Control.Monad.Fix
-import           Data.List         (transpose)
-import           Data.Maybe        (mapMaybe)
+import           Control.Arrow
+import           Data.List     (transpose)
+import           Data.Maybe    (mapMaybe)
 import           Types
 import           Widget
 
 type Layout1 p1 p2 = [p1] -> (Bounds -> [Bounds], p2)
 
 type Layout' p1 p2 a
-     = forall m i o. MonadFix m =>
+     = forall m i o. Monad m =>
                          Widget (p1, Bool) m i o -> Widget (p2, Bool) m (i, a) o
 
 type Layout p1 p2
-     = forall m i o. MonadFix m =>
+     = forall m i o. Monad m =>
                          Widget (p1, Bool) m i o -> Widget (p2, Bool) m i o
 
 type Margin = (Float, Float, Float, Float)
@@ -72,18 +72,14 @@ noLayout =
     widgetLayout $ \ps ->
         (\bs -> bs : replicate (length ps - 1) (Bounds 0 0 0 0), head ps)
 
-widgetLayout' :: (a -> Layout1 p1 p2) -> Layout' p1 p2 a
-widgetLayout' f a = buildWidget runWidget'
-  where
-    runWidget' ~(i, ia) = do
-        ~(o, ps, d) <- runWidget a i
-        let (calcBounds, p) = f ia $ map (\ ~(x, _) -> x) ps
-        return (o, (p, True), fmap (widgetLayout' f) . d . calcBounds)
-
 widgetLayout :: (Eq p1) => Layout1 p1 p2 -> Layout p1 p2
-widgetLayout f w = buildWidget $ runWidget' Nothing w
+widgetLayout f w = widgetLayout' (const f) w <<< arr (\x -> (x, ()))
+
+widgetLayout' :: (a -> Layout1 p1 p2) -> Layout' p1 p2 a
+widgetLayout' f' w = buildWidget $ runWidget' Nothing w
   where
-    runWidget' mbs w0 i = do
+    runWidget' mbs w0 (i, il) = do
+        let f = f' il
         ~(o, ps0, d) <- runWidget w0 i
         let ps = map (\ ~(x, _) -> x) ps0
             reval = any (\ ~(_, x) -> x) ps0
