@@ -24,7 +24,7 @@ import           Resources
 import           Types
 import           Widget
 
-type Widget' t i o = Widget (LayoutParam, Bool) (GUI t) i o
+type Widget' t i o = Widget (LayoutParam, Bool) (GUI t IO) i o
 
 once :: a -> Widget' t () (Maybe a)
 once x = buildWidget' $ const $ return (Just x, arr $ const Nothing)

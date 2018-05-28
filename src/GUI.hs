@@ -24,6 +24,7 @@ module GUI
 
 import           Control.Monad.Fix
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Data.Text              (Text)
 import           Drawable
 import           Resources
@@ -73,11 +74,11 @@ data Event
     | MouseMoveEvent Coords
     deriving (Show)
 
-newtype GUI t a =
-    GUI (Globals t -> IO (a, [Cmd t]))
+newtype GUI t m a =
+    GUI (Globals t -> m (a, [Cmd t]))
     deriving (Functor)
 
-instance Applicative (GUI t) where
+instance Monad m => Applicative (GUI t m) where
     pure x = GUI (const $ return (x, []))
     (<*>) (GUI f) (GUI a) =
         GUI $ \g -> do
@@ -85,7 +86,7 @@ instance Applicative (GUI t) where
             ~(a', ca) <- a g
             return (f' a', cf ++ ca)
 
-instance Monad (GUI t) where
+instance Monad m => Monad (GUI t m) where
     (>>=) ~(GUI a) f =
         GUI $ \g -> do
             ~(a', ca) <- a g
@@ -93,39 +94,39 @@ instance Monad (GUI t) where
             ~(b', cb) <- b g
             return (b', ca ++ cb)
 
-instance MonadFix (GUI t) where
+instance MonadFix m => MonadFix (GUI t m) where
     mfix f =
         GUI $ \g ->
             mdo let (GUI a) = f a'
                 ~(a', ca) <- a g
                 return (a', ca)
 
-instance MonadIO (GUI t) where
-    liftIO m = GUI $ const $ fmap (\x -> (x, [])) m
+instance MonadTrans (GUI t) where
+    lift m = GUI $ \_ -> fmap (\x -> (x, [])) m
 
-guiEvents :: GUI t [Event]
+guiEvents :: Monad m => GUI t m [Event]
 guiEvents = GUI $ \g -> return (gEvents g, [])
 
-guiResource :: ResourceId a -> GUI t (Either String (a t))
+guiResource :: MonadIO m => ResourceId a -> GUI t m (Either String (a t))
 guiResource i =
     GUI $ \g -> do
-        res <- gResources g i
+        res <- liftIO $ gResources g i
         return (res, [])
 
-guiTime :: GUI t Integer
+guiTime :: Monad m => GUI t m Integer
 guiTime = GUI $ \g -> return (gTime g, [])
 
-guiDraw :: [Drawable t] -> GUI t ()
+guiDraw :: Monad m => [Drawable t] -> GUI t m ()
 guiDraw c = GUI $ \_ -> return ((), map Render c)
 
-guiIO :: IO () -> GUI t ()
+guiIO :: Monad m => IO () -> GUI t m ()
 guiIO m = GUI $ \_ -> return ((), [RunIO m])
 
-guiStartTextInput :: GUI t ()
+guiStartTextInput :: Monad m => GUI t m ()
 guiStartTextInput = GUI $ \_ -> return ((), [StartTextInput])
 
-guiStopTextInput :: GUI t ()
+guiStopTextInput :: Monad m => GUI t m ()
 guiStopTextInput = GUI $ \_ -> return ((), [StopTextInput])
 
-runGUI :: GUI t a -> Globals t -> IO (a, [Cmd t])
+runGUI :: Monad m => GUI t m a -> Globals t -> m (a, [Cmd t])
 runGUI (GUI f) = f
